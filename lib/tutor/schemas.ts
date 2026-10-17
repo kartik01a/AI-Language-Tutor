@@ -1,0 +1,73 @@
+import { z } from "zod";
+
+// Strict turn-call output (docs/06 §5.2). Key order matters: analysis first so the
+// dialogue machine can decide before any reply text reaches TTS.
+
+export const turnCategorySchema = z.enum([
+  "understood",
+  "partially_understood",
+  "not_understood",
+  "off_topic",
+  "native_language_help",
+  "native_language_answer",
+  "dont_know",
+  "meta_request",
+  "unsafe",
+]);
+
+export const turnOutputSchema = z.object({
+  analysis: z.object({
+    category: turnCategorySchema,
+    meaning_summary: z.string().max(200),
+    recovered_fragment: z.string().nullable(),
+    off_topic_reason: z.enum(["learner_steering", "misunderstood_question"]).nullable(),
+    meta: z.object({
+      kind: z.enum(["repeat", "slower", "meaning"]).nullable(),
+      word: z.string().nullable(),
+    }),
+    goal_progress: z.array(z.object({ goal_id: z.string(), achieved: z.boolean() })),
+    recast_candidate: z
+      .object({ error_code: z.string(), original: z.string(), corrected: z.string() })
+      .nullable(),
+  }),
+  reply: z.object({
+    recast: z.string().nullable(),
+    sentences: z.array(z.string().min(1)).min(1).max(5),
+    translation: z.array(z.string()),
+    teach_phrase: z.object({ text: z.string(), translation: z.string() }).nullable(),
+  }),
+  hints: z.object({
+    hint: z.string(),
+    starter: z.string(),
+    example: z.string(),
+    example_translation: z.string(),
+  }),
+  words_introduced: z.array(
+    z.object({ lemma: z.string(), reading: z.string().nullable(), meaning: z.string() }),
+  ),
+});
+
+export type TurnOutput = z.infer<typeof turnOutputSchema>;
+export type LlmCategory = z.infer<typeof turnCategorySchema>;
+
+/**
+ * Consistency downgrades applied after the LLM classifies (docs/06 §4.2).
+ * Code never lets the model claim understanding the evidence doesn't support.
+ */
+export function reconcileCategory(
+  out: TurnOutput,
+  evidence: { borderlineConfidence: boolean; hasNonTargetTokens: boolean },
+): LlmCategory {
+  const { category, meaning_summary } = out.analysis;
+  if (category === "understood") {
+    if (meaning_summary.trim() === "") return "partially_understood";
+    if (evidence.borderlineConfidence) return "partially_understood";
+  }
+  if (
+    (category === "native_language_help" || category === "native_language_answer") &&
+    !evidence.hasNonTargetTokens
+  ) {
+    return "not_understood";
+  }
+  return category;
+}
