@@ -8,6 +8,7 @@ import type { ServerEvent } from "@/lib/contracts/events";
 import { readFrames } from "./stream";
 import { initialUi, reducer, STATUS_LABEL } from "./reducer";
 import { CorrectionCards } from "./CorrectionCards";
+import { SummaryPanel } from "./SummaryPanel";
 
 export interface ConversationProps {
   svg: string;
@@ -188,6 +189,7 @@ export function Conversation(p: ConversationProps) {
       return;
     }
     sessionId.current = j.sessionId;
+    dispatch({ type: "session", id: j.sessionId });
     dispatch({ type: "chips", chips: j.chips });
     await post({ e: "start" });
   };
@@ -227,6 +229,11 @@ export function Conversation(p: ConversationProps) {
 
   // ---- hint button and silence timers ----
   // Steps 1–3 only show text. After step 3 the tutor speaks the model answer, which needs the full path.
+  const endNow = () => {
+    interrupt();
+    turnEnded.current = false;
+    void post({ e: "end" });
+  };
   const askHint = () => void (ui.hint?.level === 3 ? post({ e: "hint_request" }) : postQuiet({ e: "hint_request" }));
   const reportCard = (cardId: string) => void postQuiet({ e: "card_report", cardId, reason: "was_correct" });
 
@@ -291,12 +298,23 @@ export function Conversation(p: ConversationProps) {
     <div className="mx-auto flex h-dvh max-w-md flex-col bg-white text-neutral-900 md:max-w-3xl">
       <header className="flex items-center justify-between px-4 py-2 text-sm">
         <span className="font-semibold">{p.tutorName} · Lactice</span>
-        {ui.wrapUp && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Wrapping up…</span>}
+        <span className="flex items-center gap-2">
+          {ui.wrapUp && ui.phase !== "ended" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Wrapping up…</span>}
+          {ui.sessionId && ui.phase !== "ended" && ui.phase !== "error" && (
+            <button
+              onClick={endNow}
+              disabled={ui.phase === "recording" || ui.phase === "processing" || ui.phase === "starting"}
+              className="rounded-full border border-neutral-300 px-3 py-1 text-xs text-neutral-900 disabled:opacity-40"
+            >
+              End conversation
+            </button>
+          )}
+        </span>
       </header>
 
-      <AvatarStage ref={stage} svg={p.svg} className="mx-auto h-[34dvh] max-h-80 w-full max-w-xs shrink-0 bg-pink-50" />
+      <AvatarStage ref={stage} svg={p.svg} className="mx-auto h-[34dvh] max-h-80 w-full max-w-xs shrink-0 bg-pink-50 [&>svg]:h-full [&>svg]:w-full" />
 
-      <ol ref={listRef} aria-live="polite" className="flex-1 space-y-2 overflow-y-auto bg-neutral-50 px-4 py-3">
+      <ol ref={listRef} aria-live="polite" className={`${ui.phase === "ended" ? "hidden" : "flex-1"} space-y-2 overflow-y-auto bg-neutral-50 px-4 py-3`}>
         {ui.messages.map((m) => (
           <li key={m.id} className={m.role === "tutor" ? "mr-8" : "ml-8 text-right"}>
             <div
@@ -319,14 +337,16 @@ export function Conversation(p: ConversationProps) {
         </p>
       )}
 
-      {ui.hint && (
+      {ui.hint && ui.phase !== "ended" && (
         <p className="bg-amber-50 px-4 py-2 text-sm text-amber-900">
           💡 <span className="font-medium">Hint {ui.hint.level}/3:</span> {ui.hint.text}
           {ui.hint.translation && <span className="text-amber-700"> — {ui.hint.translation}</span>}
         </p>
       )}
 
-      {ui.phase === "intro" ? (
+      {ui.phase === "ended" && ui.sessionId ? (
+        <SummaryPanel sessionId={ui.sessionId} />
+      ) : ui.phase === "intro" ? (
         <div className="flex flex-col items-center gap-2 px-4 py-6">
           <button onClick={begin} className="rounded-full bg-indigo-600 px-6 py-3 text-lg font-semibold text-white">
             Start talking with {p.tutorName}

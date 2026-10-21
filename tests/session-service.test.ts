@@ -299,3 +299,63 @@ describe("corrections in the live session", () => {
     expect(r.events.some((e) => e.t === "error")).toBe(false);
   });
 });
+
+describe("end-of-session summary", () => {
+  const rec = async (svc: SessionService, id: string) => collect(svc.handleTurn(id, audio, "audio/webm", speech));
+
+  it("is refused while the conversation is still going", async () => {
+    const { svc } = setup();
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    await expect(svc.summarise(sessionId)).rejects.toMatchObject({ code: "SESSION_NOT_ENDED" });
+  });
+
+  it("summarises a real session: verified fix, quoted praise, honest stats — and caches the result", async () => {
+    const { svc, spend } = setup();
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    await collect(svc.handleEvent(sessionId, { e: "topic_chip", label: "食べ物" }));
+    await rec(svc, sessionId); // ラーメンがすきです
+    await rec(svc, sessionId); // unclear
+    await rec(svc, sessionId); // 公園を行きました → particle card
+    await collect(svc.handleEvent(sessionId, { e: "hint_request" }));
+    await collect(svc.handleEvent(sessionId, { e: "end" }));
+
+    const before = await spend.monthToDate(monthKey(new Date(1_000_000)));
+    const s = await svc.summarise(sessionId);
+    expect(s.status).toBe("complete");
+    expect(s.fixes.map((f) => f.errorCode)).toEqual(["ja.particle.destination"]);
+    expect(s.didWell[0]).toMatchObject({ evidence: "ラーメンがすきです" });
+    expect(s.stats).toMatchObject({ turns: 3, unclearTurns: 1, hintsUsed: 1 });
+    // The demo "speech" is 2 s per turn → only 6 s: far too short to move the level, and it says so.
+    expect(s.level).toMatchObject({ updated: false, changed: false });
+    expect(s.level.reason).toMatch(/too short/);
+    expect(await spend.monthToDate(monthKey(new Date(1_000_000)))).toBeGreaterThan(before); // the analysis calls are paid for
+
+    const again = await svc.summarise(sessionId);
+    expect(again).toEqual(s);
+    expect(await spend.monthToDate(monthKey(new Date(1_000_000)))).toBeGreaterThan(before);
+  });
+
+  it("a card the learner reported never appears as a fix", async () => {
+    const { svc } = setup();
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    await collect(svc.handleEvent(sessionId, { e: "topic_chip", label: "週末" }));
+    await rec(svc, sessionId);
+    await rec(svc, sessionId);
+    const t3 = await rec(svc, sessionId);
+    const card = t3.events.find((e) => e.t === "corrections");
+    const id = card && card.t === "corrections" ? card.cards[0].id : "";
+    await collect(svc.handleEvent(sessionId, { e: "card_report", cardId: id, reason: "was_correct" }));
+    await collect(svc.handleEvent(sessionId, { e: "end" }));
+    const s = await svc.summarise(sessionId);
+    expect(s.fixes).toEqual([]);
+    expect(s.worthASecondLook).toEqual([]);
+  });
+
+  it("an unknown session is a clear error", async () => {
+    const { svc } = setup();
+    await expect(svc.summarise("nope")).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+  });
+});

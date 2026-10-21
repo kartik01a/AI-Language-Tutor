@@ -1,6 +1,7 @@
 // End-to-end check of the demo conversation in headless Chrome (fake mic, autoplay allowed).
 // Needs `npm run dev` running. Usage: node scripts/e2e-conversation.mjs [baseUrl]
 import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
 const base = process.argv[2] ?? "http://localhost:3000";
 const port = "9334";
 const chrome = spawn(process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", [
@@ -23,6 +24,7 @@ const clickLabel = (l) => ev(`document.querySelector('button[aria-label=${JSON.s
 const waitTurnDone = (what) => waitFor(`${status} === 'Tap to speak'`, what);
 const messages = () => ev(`[...document.querySelectorAll('ol li')].map(li => li.innerText.replace(/\\n/g,' | '))`);
 const results = {};
+const shot = async (name) => { if (process.env.SHOTS) writeFileSync(`${process.env.SHOTS}/${name}.png`, Buffer.from((await send("Page.captureScreenshot", { format: "png" })).result.data, "base64")); };
 try {
   let target;
   for (let i = 0; i < 40 && !target; i++) { await sleep(250); try { target = (await (await fetch(`http://localhost:${port}/json`)).json()).find((t) => t.type === "page"); } catch {} }
@@ -82,6 +84,7 @@ try {
   await waitFor(`document.querySelector('[data-testid=correction-card]').innerText.includes('Thanks')`, "report acknowledged", 5000);
   await waitTurnDone("turn 3 reply");
 
+  await shot("1-conversation-card");
   await clickText("Hint");
   await waitFor(`document.body.innerText.includes('Hint 1/3')`, "hint banner", 8000);
   results.hint = await ev(`document.body.innerText.match(/Hint 1\\/3:[^\\n]*/)?.[0]`);
@@ -102,6 +105,13 @@ try {
   results.mouthsSeen = await ev(`[...window.__mouths].sort()`);
   results.errorBanner = await ev(`document.querySelector('[role=alert]')?.innerText ?? null`);
   results.finalStatus = await ev(status);
+
+  // End the conversation and read the summary.
+  await clickText("End conversation");
+  await waitFor(`document.body.innerText.includes('Your summary')`, "summary screen", 15000);
+  results.summary = await ev(`document.querySelector('#summary-title').parentElement.innerText.replace(/\\n+/g,' | ')`);
+  await shot("2-summary");
+  results.summaryAlert = await ev(`document.querySelector('[role=alert]')?.innerText ?? null`);
   console.log(JSON.stringify(results, null, 2));
 } catch (e) {
   console.error("E2E FAILED:", e.message);

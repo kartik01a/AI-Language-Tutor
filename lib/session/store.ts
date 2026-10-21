@@ -2,6 +2,7 @@ import type { TurnOutput } from "@/lib/tutor/schemas";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueState } from "@/lib/tutor/types";
 import type { CorrectionCard, DroppedCorrection } from "@/lib/tutor/correction-pipeline";
+import type { SessionSummary, Skills } from "@/lib/learning/summary";
 
 export interface HistoryItem {
   role: "tutor" | "learner";
@@ -46,6 +47,10 @@ export interface SessionRecord {
   /** Times each error code was shown this session (≥2 counts as recurrent). */
   errorCounts: Record<string, number>;
   metrics: SessionMetrics;
+  /** Per-skill level estimates (in-memory in the demo; persisted per learner once the DB is wired). */
+  skills: Skills;
+  /** Computed once when first requested after the session ends. */
+  summary: SessionSummary | null;
   endEmitted: boolean;
   /** Optimistic-concurrency revision, bumped on every successful put. */
   rev: number;

@@ -6,7 +6,7 @@ import type { CorrectionCard } from "@/lib/tutor/correction-pipeline";
 // the `sentence` event they belong to.
 
 export type ErrorCode =
-  | "SESSION_NOT_FOUND" | "SESSION_ENDED" | "STATE_CONFLICT" | "BUDGET_PAUSED"
+  | "SESSION_NOT_FOUND" | "SESSION_ENDED" | "SESSION_NOT_ENDED" | "STATE_CONFLICT" | "BUDGET_PAUSED"
   | "PAYLOAD_TOO_LARGE" | "BAD_REQUEST" | "PROVIDER_FATAL" | "INTERNAL";
 
 export type ServerEvent =

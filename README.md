@@ -27,8 +27,9 @@ node scripts/cdp-eval.mjs "http://localhost:3000/dev/audio?auto=1" "document.que
 
 ## Status
 
-Built: dialogue machine, correction gates, turn pipeline, prompts, budget kill switch, session service,
-streaming API, avatar + audio engine, Supabase migration, demo conversation screen.
+Built: dialogue machine, correction pipeline + cards, spoken recast, turn pipeline, prompts, budget kill switch,
+session service, streaming API, avatar + audio engine, Supabase migration, demo conversation screen,
+end-of-session summary (verification pass, quoted praise, provisional level update).
 Not built yet (needs your keys/assets): real Deepgram/OpenAI/Azure adapters, Postgres store, auth, onboarding,
-dashboard, correction cards, end-of-session summary. The runtime refuses to start in production until real
+dashboard, trial/waitlist screens, "Try again" recording on cards, replay/slow replay buttons. The runtime refuses to start in production until real
 providers and auth exist.

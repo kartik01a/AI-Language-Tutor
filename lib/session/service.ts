@@ -11,6 +11,7 @@ import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueEvent, MachineConfig, StepResult } from "@/lib/tutor/types";
 import type { HistoryItem, SessionRecord, SessionStore } from "./store";
 import type { ClientEvent } from "@/lib/contracts/events";
+import { initialSkills, summariseSession, type SessionSummary } from "@/lib/learning/summary";
 
 export type OutFrame = { kind: "event"; event: ServerEvent } | { kind: "audio"; bytes: Uint8Array };
 
@@ -66,6 +67,7 @@ export class SessionService {
       firstName: input.firstName ?? "Learner", state: createInitialState(), history: [], lastHints: null,
       currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, corrections: [], reports: [], errorCounts: {},
       metrics: { learnerSpeechMs: 0, learnerTurns: 0, unclearTurns: 0, providerErrors: 0, maxHintLevel: 0, hintsUsed: 0, wordsIntroduced: [] },
+      skills: initialSkills(input.level), summary: null,
       endEmitted: false, rev: 0,
     };
     await this.d.store.create(rec);
@@ -143,6 +145,36 @@ export class SessionService {
     if (level === 1) return { text: h.hint };
     if (level === 2) return { text: h.starter };
     return { text: h.example, translation: h.example_translation };
+  }
+
+  /** End-of-session analysis. Computed once, after the conversation has ended. */
+  async summarise(sessionId: string): Promise<SessionSummary> {
+    const { rec, rev } = await this.load(sessionId);
+    if (rec.state.phase !== "ENDED") throw new ServiceError("SESSION_NOT_ENDED", "The conversation is still going.");
+    if (rec.summary) return rec.summary;
+
+    const reported = new Set(rec.reports.map((r) => r.cardId));
+    const m = rec.metrics;
+    const { summary, usage } = await summariseSession({
+      llm: this.d.llm,
+      endReason: rec.state.endReason ?? "time",
+      learnerLines: rec.history.filter((h) => h.role === "learner").map((h) => h.text),
+      cards: rec.corrections.flatMap((c) => c.cards),
+      reportedCardIds: reported,
+      metrics: m,
+      skills: rec.skills,
+      nonUnderstandingRate: m.learnerTurns === 0 ? 0 : m.unclearTurns / m.learnerTurns,
+    });
+    for (const u of usage) await this.addSpend(rec, llmCost("gpt-6-luna", u));
+    rec.summary = summary;
+    rec.skills = summary.skills;
+    // If a concurrent request already stored a summary, prefer that one.
+    const ok = await this.d.store.put(rec, rev);
+    if (!ok) {
+      const again = await this.d.store.get(sessionId);
+      if (again?.summary) return again.summary;
+    }
+    return summary;
   }
 
   // ---------- events ----------

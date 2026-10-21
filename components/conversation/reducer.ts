@@ -24,10 +24,11 @@ export interface UiState {
   wrapUp: boolean;
   error: string | null;
   endReason: string | null;
+  sessionId: string | null;
 }
 
 export const initialUi: UiState = {
-  phase: "intro", messages: [], chips: [], needsTopic: true, hint: null, wrapUp: false, error: null, endReason: null,
+  phase: "intro", messages: [], chips: [], needsTopic: true, hint: null, wrapUp: false, error: null, endReason: null, sessionId: null,
 };
 
 export type Action =
@@ -39,6 +40,7 @@ export type Action =
   | { type: "topic_chosen" }
   | { type: "limits"; wrapUp: boolean }
   | { type: "error"; message: string; fatal?: boolean }
+  | { type: "session"; id: string }
   | { type: "ended"; reason: string };
 
 export function reducer(s: UiState, a: Action): UiState {
@@ -61,6 +63,8 @@ export function reducer(s: UiState, a: Action): UiState {
       return { ...s, wrapUp: a.wrapUp };
     case "error":
       return a.fatal ? { ...s, phase: "error", error: a.message } : { ...s, error: a.message };
+    case "session":
+      return { ...s, sessionId: a.id };
     case "ended":
       return { ...s, phase: "ended", endReason: a.reason };
   }

@@ -66,6 +66,15 @@ export class DemoLlm implements LlmProvider {
       }));
       return { json: { items }, usage: USAGE };
     }
+    if (req.system.startsWith("VERIFY CORRECTIONS")) {
+      const verdicts = req.user.split("\n").filter(Boolean).map((l) => ({ card_id: l.split(":")[0], agree: true }));
+      return { json: { verdicts }, usage: USAGE };
+    }
+    if (req.system.startsWith("SESSION SUMMARY")) {
+      const first = req.user.split("\n").find((l) => l.startsWith("- "))?.slice(2) ?? "";
+      const quote = first.includes("ラーメンがすきです") ? "ラーメンがすきです" : first.slice(0, 6);
+      return { json: { did_well: quote ? [{ text: "You said what you like in a full sentence.", evidence: quote }] : [], next_focus: "Try adding a reason, like なぜなら…" }, usage: USAGE };
+    }
     const n = this.n++;
     const lower = req.user.toLowerCase();
     const wantsHelp = lower.includes("how do you say");
