@@ -11,7 +11,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "avatars:validate": "node --experimental-strip-types scripts/avatars.mjs validate",
     "avatars:build": "node --experimental-strip-types scripts/avatars.mjs build",
-    "avatars:placeholder": "node scripts/make-placeholder-avatar.mjs"
+    "avatars:placeholder": "node scripts/make-placeholder-avatar.mjs",
+    "dev:real": "PROVIDERS=real next dev"
   },
   "dependencies": {
     "microsoft-cognitiveservices-speech-sdk": "^1.52.0",

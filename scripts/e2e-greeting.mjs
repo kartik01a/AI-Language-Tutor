@@ -6,7 +6,7 @@ const base = process.argv[2] ?? "http://localhost:3000";
 const port = "9335";
 const chrome = spawn(process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", [
   "--headless=new", "--disable-gpu", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
-  "--autoplay-policy=no-user-gesture-required", `--remote-debugging-port=${port}`, "--user-data-dir=/tmp/lactice-greet-profile", "about:blank",
+  ...(process.env.STRICT_AUTOPLAY ? [] : ["--autoplay-policy=no-user-gesture-required"]), `--remote-debugging-port=${port}`, "--user-data-dir=/tmp/lactice-greet-profile", "about:blank",
 ], { stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ws, id = 0; const pending = new Map();
@@ -22,8 +22,16 @@ try {
   await send("Page.navigate", { url: `${base}/practice` });
   for (let i = 0; i < 40 && !(await ev(`document.body.innerText.includes('Start talking')`)); i++) await sleep(250);
   await ev(`window.__m = new Set(); setInterval(() => { const v = [...document.querySelectorAll("[id^='mouth_']")].find(e => e.getAttribute('visibility') === 'visible'); if (v) window.__m.add(v.id) }, 30); true`);
-  for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('[data-testid=status]')`)); i++) { await ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Start talking'))?.click()`); await sleep(300); }
+  const clickStart = async () => {
+    if (!process.env.STRICT_AUTOPLAY) return ev(`[...document.querySelectorAll('button')].find(b => b.textContent.includes('Start talking'))?.click()`);
+    // A genuine mouse press: Chrome's autoplay policy only counts real user activation.
+    const r = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Start talking')); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`);
+    if (!r) return;
+    for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: r.x, y: r.y, button: "left", clickCount: 1 });
+  };
+  for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('[data-testid=status]')`)); i++) { await clickStart(); await sleep(300); }
+  const audioState = await ev(`(() => { const p = window.__lacticePlayer; return p ? { state: p.ctx.state, sampleRate: p.ctx.sampleRate } : null })()`);
   let status = "";
   for (let i = 0; i < 80; i++) { status = await ev(`document.querySelector('[data-testid=status]')?.textContent`); if (status === "Tap to speak") break; await sleep(250); }
-  console.log(JSON.stringify({ status, messages: await ev(`[...document.querySelectorAll('ol li')].map(li => li.innerText.replace(/\\n/g,' | '))`), mouthsSeen: await ev(`[...window.__m].sort()`), error: await ev(`document.querySelector('[role=alert]')?.innerText ?? null`) }, null, 1));
+  console.log(JSON.stringify({ strictAutoplay: !!process.env.STRICT_AUTOPLAY, audioContextAfterClick: audioState, status, messages: await ev(`[...document.querySelectorAll('ol li')].map(li => li.innerText.replace(/\\n/g,' | '))`), mouthsSeen: await ev(`[...window.__m].sort()`), error: await ev(`document.querySelector('[role=alert]')?.innerText ?? null`) }, null, 1));
 } finally { chrome.kill(); }

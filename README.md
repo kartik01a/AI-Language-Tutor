@@ -14,8 +14,11 @@ npm run dev
 Put your keys in `.env.local` (see `.env.example`), then:
 
 ```bash
-PROVIDERS=real npm run dev     # open http://localhost:3000/practice and allow the microphone
+npm run dev:real     # same as PROVIDERS=real next dev; open http://localhost:3000/practice and allow the microphone
 ```
+
+The screen tells you which mode you are in: an amber **Demo mode** banner means scripted answers and beep sounds
+(no real voice); no banner means live Deepgram + OpenAI + Azure.
 
 This spends real money (≈ $0.002 per turn). There is **no authentication yet**, so the server refuses to run in
 production. Real-provider scripts: `scripts/probe-azure.mjs`, `probe-deepgram.mjs`, `probe-openai.mjs`,

@@ -13,6 +13,8 @@ import { SummaryPanel } from "./SummaryPanel";
 export interface ConversationProps {
   svg: string;
   tutorName: string;
+  /** "demo" = scripted tutor with beep sounds; "real" = Deepgram + OpenAI + Azure. */
+  mode: "demo" | "real";
   level: "A1" | "A2" | "B1" | "B2";
   hintPulseSeconds: number;
   nudgeSeconds: number;
@@ -175,6 +177,8 @@ export function Conversation(p: ConversationProps) {
       await pl.unlock();
       pl.onAllEnded = settle;
       player.current = pl;
+      // Dev-only handle so browser checks can verify the audio output state (never in production).
+      if (process.env.NODE_ENV !== "production") (window as unknown as { __lacticePlayer?: Player }).__lacticePlayer = pl;
       const rec = new Recorder();
       await rec.open();
       recorder.current = rec;
@@ -296,6 +300,12 @@ export function Conversation(p: ConversationProps) {
 
   return (
     <div className="mx-auto flex h-dvh max-w-md flex-col bg-white text-neutral-900 md:max-w-3xl">
+      {p.mode === "demo" && (
+        <div role="status" className="bg-amber-100 px-4 py-2 text-center text-xs text-amber-900">
+          <strong>Demo mode:</strong> scripted answers and beep sounds instead of a voice. For the real Yuki, stop the server and run{" "}
+          <code className="rounded bg-amber-200 px-1">npm run dev:real</code>.
+        </div>
+      )}
       <header className="flex items-center justify-between px-4 py-2 text-sm">
         <span className="font-semibold">{p.tutorName} · Lactice</span>
         <span className="flex items-center gap-2">
@@ -351,7 +361,11 @@ export function Conversation(p: ConversationProps) {
           <button onClick={begin} className="rounded-full bg-indigo-600 px-6 py-3 text-lg font-semibold text-white">
             Start talking with {p.tutorName}
           </button>
-          <p className="text-xs text-neutral-500">Demo mode: scripted tutor, no API keys. Your mic is only used to simulate the flow.</p>
+          <p className="text-xs text-neutral-500">
+            {p.mode === "demo"
+              ? "Demo mode: a scripted tutor, no API keys. What you say is ignored; Yuki answers from a script."
+              : "Live mode: Yuki hears you and answers with a real voice. Turn your volume up."}
+          </p>
         </div>
       ) : (
         <footer className="px-4 pb-4 pt-2">

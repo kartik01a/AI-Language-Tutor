@@ -7,11 +7,14 @@ export const metadata = { title: "Practice · Lactice" };
 
 export default function Page() {
   const cfg = loadConfig();
+  // Evaluated on the server, where PROVIDERS is visible. Anything but "real" means scripted demo providers.
+  const mode = process.env.PROVIDERS === "real" ? "real" : "demo";
   const svg = readFileSync(path.join(process.cwd(), "assets/avatars/src/ja-yuki.svg"), "utf8");
   return (
     <Conversation
       svg={svg}
       tutorName="Yuki"
+      mode={mode}
       level="A2"
       hintPulseSeconds={cfg.SILENCE_HINT_PULSE_SECONDS}
       nudgeSeconds={cfg.SILENCE_NUDGE_SECONDS}
