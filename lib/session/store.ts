@@ -1,11 +1,30 @@
 import type { TurnOutput } from "@/lib/tutor/schemas";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueState } from "@/lib/tutor/types";
+import type { CorrectionCard, DroppedCorrection } from "@/lib/tutor/correction-pipeline";
 
 export interface HistoryItem {
   role: "tutor" | "learner";
   text: string;
   notHeard?: boolean;
+}
+
+export interface CorrectionRecord {
+  turnId: string;
+  learnerText: string;
+  cards: CorrectionCard[];
+  /** Everything the pipeline proposed but the gates removed, with reasons (evaluation data). */
+  dropped: DroppedCorrection[];
+}
+
+export interface SessionMetrics {
+  learnerSpeechMs: number;
+  learnerTurns: number;
+  unclearTurns: number;
+  providerErrors: number;
+  maxHintLevel: number;
+  hintsUsed: number;
+  wordsIntroduced: { lemma: string; reading: string | null; meaning: string }[];
 }
 
 export interface SessionRecord {
@@ -22,6 +41,11 @@ export interface SessionRecord {
   lastActivityAt: number;
   seq: number;
   costUsd: number;
+  corrections: CorrectionRecord[];
+  reports: { cardId: string; reason: string }[];
+  /** Times each error code was shown this session (≥2 counts as recurrent). */
+  errorCounts: Record<string, number>;
+  metrics: SessionMetrics;
   endEmitted: boolean;
   /** Optimistic-concurrency revision, bumped on every successful put. */
   rev: number;

@@ -1,5 +1,6 @@
 import type { VisemeEvent } from "@/lib/avatar/visemes";
 import type { TurnCategory } from "@/lib/tutor/types";
+import type { CorrectionCard } from "@/lib/tutor/correction-pipeline";
 
 // Server → client events (docs/11 §3.3). Audio travels in separate binary frames that follow
 // the `sentence` event they belong to.
@@ -15,6 +16,7 @@ export type ServerEvent =
       t: "sentence"; seq: number; messageId: string; index: number; text: string; translation?: string;
       role: "template" | "reply"; audio: { format: "wav" | "mp3"; durationMs: number }; visemes: VisemeEvent[];
     }
+  | { t: "corrections"; seq: number; turnId: string; cards: CorrectionCard[] }
   | { t: "hint"; seq: number; level: 1 | 2 | 3; text: string; translation?: string }
   | { t: "limits"; seq: number; activeSeconds: number; wrapUp: boolean; reason: string | null }
   | { t: "turn_end"; seq: number; stateVersion: number; expect: "learner" | "end" }
@@ -25,5 +27,6 @@ export type ClientEvent =
   | { e: "start" }
   | { e: "topic_chip"; label: string }
   | { e: "hint_request" }
+  | { e: "card_report"; cardId: string; reason: "was_correct" | "misheard" | "other" }
   | { e: "silence_timeout" }
   | { e: "end" };

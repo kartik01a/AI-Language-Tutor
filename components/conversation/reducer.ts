@@ -1,3 +1,5 @@
+import type { CorrectionCard } from "@/lib/tutor/correction-pipeline";
+
 // UI state for the conversation screen (docs/02 §5.3). The server's dialogue machine owns
 // pedagogy; this only tracks what to show.
 
@@ -9,6 +11,8 @@ export interface Message {
   text: string;
   translation?: string;
   unclear?: boolean;
+  /** Set on learner messages once the correction pipeline has produced cards. */
+  cards?: CorrectionCard[];
 }
 
 export interface UiState {
@@ -31,6 +35,7 @@ export type Action =
   | { type: "chips"; chips: UiState["chips"] }
   | { type: "message"; message: Message }
   | { type: "hint"; hint: UiState["hint"] }
+  | { type: "cards"; turnId: string; cards: CorrectionCard[] }
   | { type: "topic_chosen" }
   | { type: "limits"; wrapUp: boolean }
   | { type: "error"; message: string; fatal?: boolean }
@@ -48,6 +53,8 @@ export function reducer(s: UiState, a: Action): UiState {
       return { ...s, messages: [...s.messages, a.message] };
     case "hint":
       return { ...s, hint: a.hint };
+    case "cards":
+      return { ...s, messages: s.messages.map((m) => (m.id === a.turnId ? { ...m, cards: a.cards } : m)) };
     case "topic_chosen":
       return { ...s, needsTopic: false };
     case "limits":

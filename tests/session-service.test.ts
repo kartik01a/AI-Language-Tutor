@@ -222,3 +222,80 @@ describe("failures", () => {
     expect(total).toBeLessThan(0.02);
   });
 });
+
+describe("corrections in the live session", () => {
+  const turn = async (svc: SessionService, id: string) => collect(svc.handleTurn(id, audio, "audio/webm", speech));
+  async function started(over = {}) {
+    const s = setup(over);
+    const { sessionId } = await s.svc.createSession({ level: "A2" });
+    await collect(s.svc.handleEvent(sessionId, { e: "start" }));
+    await collect(s.svc.handleEvent(sessionId, { e: "topic_chip", label: "週末" }));
+    return { ...s, sessionId };
+  }
+
+  it("a genuine particle error gets a card (answer hidden first), arriving with the same turn", async () => {
+    const { svc, sessionId } = await started();
+    await turn(svc, sessionId); // 1: clear, no error
+    await turn(svc, sessionId); // 2: unclear
+    const r = await turn(svc, sessionId); // 3: 公園を行きました
+    const c = r.events.find((e) => e.t === "corrections");
+    expect(c && c.t === "corrections" && c.cards).toHaveLength(1);
+    const card = c && c.t === "corrections" ? c.cards[0] : null;
+    expect(card).toMatchObject({ errorCode: "ja.particle.destination", original: "を", corrected: "に", tryAgainFirst: true });
+    expect(r.types.indexOf("corrections")).toBeLessThan(r.types.indexOf("turn_end"));
+  });
+
+  it("correct sentences and unclear turns produce no cards", async () => {
+    const { svc, sessionId } = await started();
+    const good = await turn(svc, sessionId);
+    const unclear = await turn(svc, sessionId);
+    expect(good.types).not.toContain("corrections");
+    expect(unclear.types).not.toContain("corrections");
+  });
+
+  it("the tutor never calls the correction pipeline for an unclear turn (no wasted cost)", async () => {
+    const unclear = new FakeStt([stt("すきな しく", [0.4, 0.3])]);
+    const { svc, spend, sessionId } = await started({ stt: unclear });
+    const before = await spend.monthToDate(monthKey(new Date(1_000_000)));
+    await turn(svc, sessionId);
+    const after = await spend.monthToDate(monthKey(new Date(1_000_000)));
+    expect(after - before).toBeLessThan(0.005); // STT + TTS only; no 3 detection calls
+  });
+
+  it("fast-path recast: a clear tense error is echoed in Yuki's voice, before the reply", async () => {
+    const { svc, sessionId } = await started();
+    for (let i = 0; i < 5; i++) await turn(svc, sessionId); // advance the demo script to the tense error
+    const r = await turn(svc, sessionId);
+    const texts = r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : []));
+    expect(texts[0]).toBe("ラーメンを食べたんですね！");
+    const card = r.events.find((e) => e.t === "corrections");
+    expect(card && card.t === "corrections" && card.cards[0]).toMatchObject({ errorCode: "ja.verb.tense", corrected: "たべました" });
+  });
+
+  it("Relaxed strictness shows the answer immediately; reports are stored for evaluation", async () => {
+    const s = setup();
+    const { sessionId } = await s.svc.createSession({ level: "A2", strictness: "relaxed" });
+    await collect(s.svc.handleEvent(sessionId, { e: "start" }));
+    await collect(s.svc.handleEvent(sessionId, { e: "topic_chip", label: "週末" }));
+    for (let i = 0; i < 5; i++) await turn(s.svc, sessionId);
+    const r = await turn(s.svc, sessionId);
+    const c = r.events.find((e) => e.t === "corrections");
+    expect(c && c.t === "corrections" && c.cards[0].tryAgainFirst).toBe(false);
+    const rep = await collect(s.svc.handleEvent(sessionId, { e: "card_report", cardId: "x", reason: "was_correct" }));
+    expect(rep.types).toContain("turn_end");
+  });
+
+  it("a failing correction pipeline never breaks the conversation", async () => {
+    const s = setup();
+    const llm = (s.svc as unknown as { d: { llm: { turn: unknown } } }).d.llm;
+    const orig = llm.turn as (r: { system: string }) => Promise<unknown>;
+    llm.turn = (req: { system: string }) => (req.system.startsWith("EDIT DETECTION") ? Promise.reject(new Error("down")) : orig.call(llm, req));
+    const { sessionId } = await s.svc.createSession({ level: "A2" });
+    await collect(s.svc.handleEvent(sessionId, { e: "start" }));
+    await collect(s.svc.handleEvent(sessionId, { e: "topic_chip", label: "週末" }));
+    const r = await turn(s.svc, sessionId);
+    expect(r.types).toContain("turn_end");
+    expect(r.types).not.toContain("corrections");
+    expect(r.events.some((e) => e.t === "error")).toBe(false);
+  });
+});

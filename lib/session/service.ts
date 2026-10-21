@@ -4,6 +4,7 @@ import type { ServerEvent, ErrorCode } from "@/lib/contracts/events";
 import type { LlmProvider, SttProvider, TtsProvider } from "@/lib/providers/types";
 import { createInitialState, step } from "@/lib/tutor/dialogue-machine";
 import { processLearnerTurn } from "@/lib/tutor/turn-pipeline";
+import { fastPathRecastAllowed, runCorrectionPipeline } from "@/lib/tutor/correction-pipeline";
 import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, templateFor, type Spoken } from "@/lib/tutor/templates";
 import { TUTORS } from "@/lib/tutor/tutors";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
@@ -63,7 +64,9 @@ export class SessionService {
     const rec: SessionRecord = {
       id: this.newId(), tutorId: tutor.id, level: input.level, strictness: input.strictness ?? "balanced",
       firstName: input.firstName ?? "Learner", state: createInitialState(), history: [], lastHints: null,
-      currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, endEmitted: false, rev: 0,
+      currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, corrections: [], reports: [], errorCounts: {},
+      metrics: { learnerSpeechMs: 0, learnerTurns: 0, unclearTurns: 0, providerErrors: 0, maxHintLevel: 0, hintsUsed: 0, wordsIntroduced: [] },
+      endEmitted: false, rev: 0,
     };
     await this.d.store.create(rec);
     return {
@@ -168,6 +171,8 @@ export class SessionService {
       case "hint_request": {
         const r = this.applyStep(rec, { type: "hint_request" });
         if (r.action.kind === "HINT") {
+          rec.metrics.hintsUsed++;
+          rec.metrics.maxHintLevel = Math.max(rec.metrics.maxHintLevel, r.action.level);
           yield this.emit(rec, { t: "hint", level: r.action.level, ...this.hintText(rec, r.action.level) });
         } else if (r.action.kind === "MODEL_ANSWER_AND_MOVE_ON") {
           const ex = this.hintText(rec, 3);
@@ -184,6 +189,11 @@ export class SessionService {
           yield* this.speak(rec, [YUKI_CLOSING], "template", messageId);
           this.applyStep(rec, { type: "closing_delivered" });
         }
+        break;
+      }
+      case "card_report": {
+        // Reports feed the evaluation set and auto-disable noisy categories (docs/06 §11).
+        rec.reports.push({ cardId: ev.cardId, reason: ev.reason });
         break;
       }
       case "end": {
@@ -248,7 +258,40 @@ export class SessionService {
     if (result.asr && !unclear) rec.history.push({ role: "learner", text: result.asr.text.replace(/ /g, "") });
     yield this.emit(rec, { t: "category", category: result.category, action: result.action.kind });
 
-    if (result.analysis) rec.lastHints = result.analysis.hints;
+    if (result.analysis) {
+      rec.lastHints = result.analysis.hints;
+      for (const w of result.analysis.words_introduced) {
+        if (!rec.metrics.wordsIntroduced.some((x) => x.lemma === w.lemma)) rec.metrics.wordsIntroduced.push(w);
+      }
+    }
+    if (result.category !== "PROVIDER_ERROR") {
+      rec.metrics.learnerTurns++;
+      rec.metrics.learnerSpeechMs += clip.speechMs;
+    }
+    if (unclear) rec.metrics.unclearTurns++;
+    if (result.category === "PROVIDER_ERROR") rec.metrics.providerErrors++;
+
+    // Corrections start now, in parallel with the tutor speaking, and never block the reply.
+    const allowCorrections =
+      result.category === "UNDERSTOOD" && result.asr !== null && result.gate !== null &&
+      (result.action.kind === "RESPOND" || result.action.kind === "ACKNOWLEDGE_REPETITION") && result.action.allowCorrections;
+    const recurrent = new Set(Object.entries(rec.errorCounts).filter(([, n]) => n >= 2).map(([c]) => c));
+    const correctionsP = allowCorrections && result.asr && result.gate
+      ? runCorrectionPipeline(this.d.llm, {
+          words: result.asr.words, lang: "ja", level: rec.level, strictness: rec.strictness,
+          riskSpans: result.gate.riskSpans, recurrent, relaxedRecastTurn: rec.metrics.learnerTurns % 2 === 0,
+        }).catch(() => null)
+      : null;
+
+    // Spoken recast: only via the fast path's strict checks (never ASR-fragile, never near a risky word).
+    let recast: Spoken | null = null;
+    if (allowCorrections && result.analysis && result.asr && result.gate && result.analysis.reply.recast) {
+      const ok = fastPathRecastAllowed(result.analysis.analysis.recast_candidate, {
+        words: result.asr.words, riskSpans: result.gate.riskSpans, level: rec.level, strictness: rec.strictness,
+        relaxedRecastTurn: rec.metrics.learnerTurns % 2 === 0, recurrent,
+      });
+      if (ok) recast = { text: result.analysis.reply.recast, translation: "" };
+    }
 
     // What the tutor says: a template for recovery actions, the validated LLM reply otherwise.
     const example = rec.lastHints ? { text: rec.lastHints.example, translation: rec.lastHints.example_translation } : undefined;
@@ -258,7 +301,18 @@ export class SessionService {
     } else if (result.replySentences && result.analysis) {
       const tr = result.analysis.reply.translation;
       const lines: Spoken[] = result.replySentences.map((text, i) => ({ text, translation: tr[i] ?? "" }));
-      yield* this.speak(rec, lines, "reply", messageId);
+      yield* this.speak(rec, recast ? [recast, ...lines] : lines, "reply", messageId);
+    }
+
+    if (correctionsP) {
+      const out = await correctionsP;
+      if (out) {
+        for (const u of out.usage) await this.addSpend(rec, llmCost("gpt-6-luna", u));
+        const cards = out.cards.map((c) => ({ ...c, id: `${turnId}-${c.id}` }));
+        for (const c of cards) rec.errorCounts[c.errorCode] = (rec.errorCounts[c.errorCode] ?? 0) + 1;
+        rec.corrections.push({ turnId, learnerText: result.asr?.text.replace(/ /g, "") ?? "", cards, dropped: out.dropped });
+        if (cards.length > 0) yield this.emit(rec, { t: "corrections", turnId, cards });
+      }
     }
 
     if (result.action.kind === "PROVIDER_FATAL") {

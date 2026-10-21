@@ -7,6 +7,7 @@ import { Recorder, classifyMicError } from "@/lib/audio/recorder";
 import type { ServerEvent } from "@/lib/contracts/events";
 import { readFrames } from "./stream";
 import { initialUi, reducer, STATUS_LABEL } from "./reducer";
+import { CorrectionCards } from "./CorrectionCards";
 
 export interface ConversationProps {
   svg: string;
@@ -84,6 +85,9 @@ export function Conversation(p: ConversationProps) {
         case "sentence":
           pendingSentence.current = isMuted ? null : e;
           break;
+        case "corrections":
+          dispatch({ type: "cards", turnId: e.turnId, cards: e.cards });
+          break;
         case "hint":
           dispatch({ type: "hint", hint: { level: e.level, text: e.text, translation: e.translation } });
           break;
@@ -150,6 +154,18 @@ export function Conversation(p: ConversationProps) {
     [run],
   );
 
+  /** Lightweight requests (hint, report) only apply their own events; they must not touch turn state. */
+  const postQuiet = useCallback(async (body: unknown) => {
+    const res = await fetch(`/api/sessions/${sessionId.current}/events`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    await readFrames(res, {
+      event: (e) => {
+        if (e.t === "hint") dispatch({ type: "hint", hint: { level: e.level, text: e.text, translation: e.translation } });
+        else if (e.t === "error") dispatch({ type: "error", message: e.message, fatal: !e.retryable });
+      },
+      audio: () => {},
+    }).catch(() => {});
+  }, []);
+
   // ---- start (must run inside the user's tap so audio and mic unlock) ----
   const begin = async () => {
     dispatch({ type: "phase", phase: "starting" });
@@ -210,7 +226,9 @@ export function Conversation(p: ConversationProps) {
   }, [interrupt, run]);
 
   // ---- hint button and silence timers ----
-  const askHint = () => void post({ e: "hint_request" });
+  // Steps 1–3 only show text. After step 3 the tutor speaks the model answer, which needs the full path.
+  const askHint = () => void (ui.hint?.level === 3 ? post({ e: "hint_request" }) : postQuiet({ e: "hint_request" }));
+  const reportCard = (cardId: string) => void postQuiet({ e: "card_report", cardId, reason: "was_correct" });
 
   useEffect(() => {
     if (ui.phase !== "waiting") return;
@@ -290,6 +308,7 @@ export function Conversation(p: ConversationProps) {
               {m.text}
               {m.translation && <div className="mt-1 text-xs text-neutral-500">{m.translation}</div>}
             </div>
+            {m.cards && m.cards.length > 0 && <CorrectionCards cards={m.cards} onReport={reportCard} />}
           </li>
         ))}
       </ol>

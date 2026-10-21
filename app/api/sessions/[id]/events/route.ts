@@ -5,6 +5,7 @@ const event = z.discriminatedUnion("e", [
   z.object({ e: z.literal("start") }),
   z.object({ e: z.literal("topic_chip"), label: z.string().min(1).max(40) }),
   z.object({ e: z.literal("hint_request") }),
+  z.object({ e: z.literal("card_report"), cardId: z.string().min(1).max(100), reason: z.enum(["was_correct", "misheard", "other"]) }),
   z.object({ e: z.literal("silence_timeout") }),
   z.object({ e: z.literal("end") }),
 ]);

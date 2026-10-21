@@ -54,7 +54,7 @@ try {
   await ev(`window.__tl = []; window.__tlT = setInterval(() => { const s = document.querySelector('[data-testid=status]')?.textContent; if (s && window.__tl.at(-1) !== s) window.__tl.push(s) }, 50); true`);
   results.clickStart = await clickLabel("Start recording");
   await waitFor(`${status}?.includes('Listening')`, "recording state");
-  await sleep(1600);
+  await sleep(3300); // long enough to always include the fake mic's periodic beep
   results.clickStop = await clickLabel("Stop and send");
   await waitFor(`${status}?.includes('Thinking') || ${status}?.includes('Speaking')`, "processing");
   await waitTurnDone("turn 1 reply");
@@ -64,10 +64,23 @@ try {
   // Turn 2: scripted STT returns an unclear utterance.
   await clickLabel("Start recording");
   await waitFor(`${status}?.includes('Listening')`, "recording 2");
-  await sleep(1600);
+  await sleep(3300); // long enough to always include the fake mic's periodic beep
   await clickLabel("Stop and send");
   await waitTurnDone("turn 2 reply");
   results.afterTurn2 = (await messages()).slice(-3);
+
+  // Turn 3: the learner makes a genuine particle error (を instead of に) → correction card.
+  await clickLabel("Start recording");
+  await waitFor(`${status}?.includes('Listening')`, "recording 3a");
+  await sleep(3300); // long enough to always include the fake mic's periodic beep
+  await clickLabel("Stop and send");
+  await waitFor(`!!document.querySelector('[data-testid=correction-card]')`, "correction card appears", 15000);
+  results.cardBefore = await ev(`document.querySelector('[data-testid=correction-card]').innerText.replace(/\\n/g,' | ')`);
+  await clickText("Show answer");
+  results.cardAfter = await ev(`document.querySelector('[data-testid=correction-card]').innerText.replace(/\\n/g,' | ')`);
+  await clickLabel("Report this correction as wrong");
+  await waitFor(`document.querySelector('[data-testid=correction-card]').innerText.includes('Thanks')`, "report acknowledged", 5000);
+  await waitTurnDone("turn 3 reply");
 
   await clickText("Hint");
   await waitFor(`document.body.innerText.includes('Hint 1/3')`, "hint banner", 8000);
@@ -75,8 +88,8 @@ try {
 
   // Interrupt: send another turn, and press the mic while the tutor is still speaking.
   await clickLabel("Start recording");
-  await waitFor(`${status}?.includes('Listening')`, "recording 3");
-  await sleep(1600);
+  await waitFor(`${status}?.includes('Listening')`, "recording 4");
+  await sleep(3300); // long enough to always include the fake mic's periodic beep
   await clickLabel("Stop and send");
   await waitFor(`${status}?.includes('Speaking')`, "tutor speaking before interrupt");
   await clickLabel("Start recording"); // pressing the mic while the tutor speaks
