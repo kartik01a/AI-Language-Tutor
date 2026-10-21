@@ -62,7 +62,7 @@ export class AvatarController {
   private state: AvatarState = "idle";
   private expressionOverride: ExpressionId | null = null;
   private track: VisemeEvent[] | null = null;
-  private trackStartMs = 0;
+  /** Returns elapsed audible ms since the start of the current message. */
   private clock: (() => number) | null = null;
   private reducedMotion = false;
   private blinkAt: number | null = null;
@@ -97,12 +97,23 @@ export class AvatarController {
     this.blinkAt = this.lastNow;
   }
 
-  /** `clock` returns elapsed ms of the audio being played (AudioContext time − output latency). */
-  playVisemeTrack(track: VisemeEvent[], clock: () => number) {
-    this.track = track;
+  /**
+   * Begin lip-syncing a message. `clock` returns elapsed audible ms since the message started
+   * (AudioContext time − start − output latency); times in tracks are on that same timeline.
+   */
+  startMessage(clock: () => number) {
+    this.track = [];
     this.clock = clock;
-    this.trackStartMs = clock();
     this.state = "speaking";
+  }
+  /** Append mouth shapes for a later sentence; `offsetMs` places it on the message timeline. */
+  appendVisemes(events: VisemeEvent[], offsetMs = 0) {
+    if (!this.track) this.track = [];
+    for (const e of events) this.track.push({ t: e.t + offsetMs, v: e.v });
+  }
+  playVisemeTrack(track: VisemeEvent[], clock: () => number) {
+    this.startMessage(clock);
+    this.appendVisemes(track);
   }
   stopSpeaking() {
     this.track = null;
@@ -139,7 +150,7 @@ export class AvatarController {
     // Mouth: viseme track while speaking, otherwise the state's rest mouth.
     let mouth: VisemeId = STATE_REST_MOUTH[this.state];
     if (this.forcedMouth) mouth = this.forcedMouth;
-    else if (this.track && this.clock) mouth = visemeAt(this.track, this.clock() - this.trackStartMs);
+    else if (this.track && this.clock) mouth = visemeAt(this.track, this.clock());
 
     const t = nowMs / 1000;
     const still = this.reducedMotion;

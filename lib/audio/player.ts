@@ -12,6 +12,8 @@ export class Player {
   private clips: QueuedClip[] = [];
   private decoded: AudioBuffer[] = []; // cached for Replay (no network, no TTS cost)
   private prevEndAt: number | null = null;
+  /** ctx time at which the current message's first clip starts (the lip-sync timeline origin). */
+  private messageStartAt: number | null = null;
   userOffsetMs = 0;
   onAllEnded?: () => void;
 
@@ -43,6 +45,7 @@ export class Player {
     source.connect(this.ctx.destination);
     source.start(plan.startAt);
     this.prevEndAt = plan.endAt;
+    if (this.messageStartAt === null) this.messageStartAt = plan.startAt;
     const clip: QueuedClip = { ...plan, buffer, source };
     source.onended = () => {
       if (this.clips.every((c) => c.endAt <= this.ctx.currentTime + 0.05)) this.onAllEnded?.();
@@ -66,6 +69,7 @@ export class Player {
     }
     this.clips = [];
     this.prevEndAt = null;
+    this.messageStartAt = null;
     return { playedMs };
   }
 
@@ -81,16 +85,25 @@ export class Player {
     this.decoded = [];
   }
 
-  /** Elapsed audible ms of the clip currently playing (drives the avatar's viseme track). */
-  lipSyncClock(clipIndex: number): number {
-    const c = this.clips[clipIndex];
-    if (!c) return 0;
+  /** Offset (ms) of a queued clip on the message timeline; use to place its visemes. */
+  clipOffsetMs(clip: QueuedClip): number {
+    return this.messageStartAt === null ? 0 : (clip.startAt - this.messageStartAt) * 1000;
+  }
+
+  /** Elapsed audible ms since the message started (drives the avatar's viseme timeline). */
+  messageClockMs(): number {
+    if (this.messageStartAt === null) return 0;
     return lipSyncElapsedMs({
       ctxTime: this.ctx.currentTime,
-      clipStartAt: c.startAt,
+      clipStartAt: this.messageStartAt,
       outputLatencySec: effectiveOutputLatency(this.ctx),
       userOffsetMs: this.userOffsetMs,
     });
+  }
+
+  /** True while any scheduled clip is still audible or pending. */
+  get isPlaying(): boolean {
+    return this.clips.some((c) => c.endAt > this.ctx.currentTime);
   }
 
   get queued(): readonly QueuedClip[] {

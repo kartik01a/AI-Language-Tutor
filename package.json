@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "avatars:validate": "node --experimental-strip-types scripts/avatars.mjs validate",
     "avatars:build": "node --experimental-strip-types scripts/avatars.mjs build",
     "avatars:placeholder": "node scripts/make-placeholder-avatar.mjs"

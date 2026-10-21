@@ -90,13 +90,13 @@ describe("AvatarController", () => {
 
   it("follows a viseme track against the audio clock", () => {
     const c = new AvatarController(rng);
-    let audio = 5000; // audio clock starts mid-stream; track times are relative to its start
+    let audio = 0; // elapsed audible ms since the message started
     c.playVisemeTrack([{ t: 0, v: "a" }, { t: 100, v: "mbp" }, { t: 250, v: "rest" }], () => audio);
     expect(c.getState()).toBe("speaking");
     expect(c.frame(0).mouth).toBe("a");
-    audio = 5120;
+    audio = 120;
     expect(c.frame(120).mouth).toBe("mbp");
-    audio = 5300;
+    audio = 300;
     expect(c.frame(300).mouth).toBe("rest");
     c.stopSpeaking();
     c.setState("listening");
@@ -127,6 +127,19 @@ describe("AvatarController", () => {
     c.blink();
     const peak = Math.max(...[0, 20, 40, 60].map((t) => c.frame(t).blink));
     expect(peak).toBe(1);
+  });
+
+  it("later sentences are placed on the message timeline, and nothing shows before audio starts", () => {
+    const c = new AvatarController(rng);
+    let audio = -40; // audio not audible yet (output latency)
+    c.startMessage(() => audio);
+    c.appendVisemes([{ t: 0, v: "a" }, { t: 100, v: "e" }]);
+    c.appendVisemes([{ t: 0, v: "o" }], 800); // second sentence starts 800 ms into the message
+    expect(c.frame(0).mouth).toBe("rest");
+    audio = 50;
+    expect(c.frame(1).mouth).toBe("a");
+    audio = 850;
+    expect(c.frame(2).mouth).toBe("o");
   });
 
   it("an explicit viseme overrides the track (for the Avatar Lab)", () => {
