@@ -9,6 +9,19 @@ npm run typecheck
 npm run dev
 ```
 
+## Try it with the REAL providers (speak Japanese to Yuki)
+
+Put your keys in `.env.local` (see `.env.example`), then:
+
+```bash
+PROVIDERS=real npm run dev     # open http://localhost:3000/practice and allow the microphone
+```
+
+This spends real money (≈ $0.002 per turn). There is **no authentication yet**, so the server refuses to run in
+production. Real-provider scripts: `scripts/probe-azure.mjs`, `probe-deepgram.mjs`, `probe-openai.mjs`,
+`real-session.mjs`, `eval-corrections.mjs` — run with
+`node --env-file=.env.local node_modules/.bin/tsx scripts/<name>.mjs`. Measurements: `docs/research/notes/phase0-measurements.md`.
+
 ## Try the demo conversation (no API keys)
 
 ```bash
@@ -29,7 +42,8 @@ node scripts/cdp-eval.mjs "http://localhost:3000/dev/audio?auto=1" "document.que
 
 Built: dialogue machine, correction pipeline + cards, spoken recast, turn pipeline, prompts, budget kill switch,
 session service, streaming API, avatar + audio engine, Supabase migration, demo conversation screen,
-end-of-session summary (verification pass, quoted praise, provisional level update).
-Not built yet (needs your keys/assets): real Deepgram/OpenAI/Azure adapters, Postgres store, auth, onboarding,
+end-of-session summary (verification pass, quoted praise, provisional level update),
+**real Deepgram / OpenAI / Azure adapters** (hedged requests, schema warm-up, parallel TTS).
+Not built yet: Postgres store, auth, onboarding,
 dashboard, trial/waitlist screens, "Try again" recording on cards, replay/slow replay buttons. The runtime refuses to start in production until real
 providers and auth exist.

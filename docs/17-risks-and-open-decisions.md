@@ -18,7 +18,7 @@ Likelihood/Impact: H/M/L.
 | R-04 | LLM over-corrects / flags valid variants (incl. Indian English) | H | H | Taxonomy-limited minimal edits, 2/3 voting, deterministic gates, allowlist, verifier, report button + auto-disable | P3 |
 | R-05 | No public benchmark for LLM correction of Japanese learner speech | H | M | In-house S5/S6 datasets with native teacher labels | P2/P3 |
 | R-06 | Azure standard voices judged less natural than ElevenLabs → engagement drop | M | M | Blind test decision rule; ElevenLabs path costed ([12 §6](12-cost-and-performance-model.md)) | P0 |
-| R-07 | Azure ja-JP viseme events unavailable (docs conflict) | M | L | Word-boundary + kana mora visemes; audio-analysis fallback | P0 |
+| R-07 | ~~Azure ja-JP viseme events unavailable~~ ✅ **Resolved 2026-10-22: ja-JP, de-DE and en-US all return viseme events** ([measurements](research/notes/phase0-measurements.md)); fallbacks kept only as a safety net | – | – | – | done |
 | R-08 | $50/month insufficient beyond ≈ 450–1,000 trial users/month or ≈ 100 engaged users | H | M | Kill switch; trial limit; WaveNet tier; waitlist gating; monetise before scaling | P2/P7 |
 | R-09 | Supabase Free pauses/has no backups | M | H | Weekly dumps + keep-alive during beta; Pro ($25) at public launch | P4/P6 |
 | R-10 | OpenAI model deprecations (fast cadence) break pinned models | H | M | Provider-neutral schemas; eval suite as regression; Haiku 5.5 failover | ongoing |
@@ -31,6 +31,7 @@ Likelihood/Impact: H/M/L.
 | R-17 | Learner audio datasets hard to collect | M | M | Teacher-recorded learner-style items; small paid sessions; staged dataset growth | P0–P5 |
 | R-18 | Tutor persona drift (tone/register inconsistent across turns) | M | M | Persona config, register rules, few-shots, naturalness ratings | P3 |
 | R-19 | Abuse farming trial minutes | M | M | Google sign-in, IP-hash guard, rate limits, VAD gating, turn cap | P4 |
+| R-21 | **Latency target missed in first real measurement:** time to first audio 4.6–6.6 s vs ≤ 2.5 s median (STT 1–2.5 s, LLM ≈ 3 s; measured from a laptop, not Mumbai); OpenAI shows a heavy latency tail (11–15 s outliers) | H | H | Hedged requests + schema warm-up (done); re-measure from asia-south1; options: Fast mode (2× price), spoken filler that claims no understanding, shorter analysis fields, alternative STT/LLM; keep streaming in reserve (saves only ≈ 0.3–0.5 s) | P0/P2 |
 | R-20 | Solo-developer bandwidth | H | M | Strict MVP scope; phase gates; languages launch independently | all |
 
 ---
