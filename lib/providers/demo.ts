@@ -13,6 +13,7 @@ const SCRIPT: { text: string; conf: number | number[]; lang?: string }[] = [
   { text: "ともだち と いきました", conf: 0.96 },
   { text: "わたし は how do you say engineer", conf: 0.93 },
   { text: "きのう ラーメン を たべます", conf: 0.95 }, // tense error → spoken recast + card
+  { text: "わたし は とうきょう に すんで います", conf: 0.55 }, // mid confidence → "Did you say …?"
 ];
 
 export class DemoStt implements SttProvider {

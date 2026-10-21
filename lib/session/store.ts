@@ -1,6 +1,8 @@
 import type { TurnOutput } from "@/lib/tutor/schemas";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueState } from "@/lib/tutor/types";
+import type { SttResult } from "@/lib/providers/types";
+import type { GateOutcome } from "@/lib/tutor/gates";
 import type { CorrectionCard, DroppedCorrection } from "@/lib/tutor/correction-pipeline";
 import type { SessionSummary, Skills } from "@/lib/learning/summary";
 
@@ -43,6 +45,8 @@ export interface SessionRecord {
   seq: number;
   costUsd: number;
   reports: { cardId: string; reason: string }[];
+  /** A transcript awaiting the learner's "Yes, that's what I said" (see CONFIRM_HEARD). */
+  pendingConfirm: { turnId: string; asr: SttResult; gate: GateOutcome; clip: { speechMs: number; clipMs: number }; mime: string } | null;
   metrics: SessionMetrics;
   /** Per-skill level estimates (in-memory in the demo; persisted per learner once the DB is wired). */
   skills: Skills;

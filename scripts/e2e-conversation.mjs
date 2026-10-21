@@ -106,6 +106,30 @@ try {
   results.errorBanner = await ev(`document.querySelector('[role=alert]')?.innerText ?? null`);
   results.finalStatus = await ev(status);
 
+  // Two ordinary turns to advance the demo script, then a mid-confidence line → "Did you say …?".
+  const recordTurn = async (label) => {
+    await clickLabel("Start recording");
+    await waitFor(`${status}?.includes('Listening')`, `recording ${label}`);
+    await sleep(3300);
+    await clickLabel("Stop and send");
+    await waitFor(`${status} !== 'Listening… tap to send'`, `sent ${label}`);
+  };
+  await recordTurn("5"); await waitTurnDone("turn 5");
+  await recordTurn("6"); await waitTurnDone("turn 6");
+  await recordTurn("7 (mid-confidence)");
+  await waitFor(`!!document.querySelector('[data-testid=confirm-buttons]')`, "confirm buttons appear", 20000);
+  await waitTurnDone("confirmation question spoken");
+  results.confirmBubble = await ev(`document.querySelector('[data-testid=confirm-buttons]').closest('li').innerText.replace(/\\n+/g,' | ')`);
+  results.tutorAsked = (await messages()).at(-1);
+  await shot("3-confirm");
+  const bubblesBefore = await ev(`[...document.querySelectorAll('ol li')].length`);
+  await clickText("Yes, that");
+  await waitFor(`!document.querySelector('[data-testid=confirm-buttons]')`, "buttons gone after Yes", 10000);
+  await waitFor(`${status} === 'Tap to speak'`, "reply after Yes", 30000);
+  results.afterYes = (await messages()).slice(-3);
+  results.newBubblesAfterYes = (await ev(`[...document.querySelectorAll('ol li')].length`)) - bubblesBefore;
+  results.duplicateLearnerBubbles = await ev(`[...document.querySelectorAll('ol li')].filter(li => li.className.includes('ml-8') && li.innerText.includes('とうきょうにすんでいます')).length`);
+
   // End the conversation and read the summary.
   await clickText("End conversation");
   await waitFor(`document.body.innerText.includes('Your summary')`, "summary screen", 15000);

@@ -243,3 +243,37 @@ describe("invariants", () => {
     expect(JSON.stringify(s)).toBe(frozen);
   });
 });
+
+describe("confirm-what-we-heard (CONFIRM_HEARD)", () => {
+  it("asks once, and the confirmation itself is not counted as a turn", () => {
+    const r = run([...started, turn("CONFIRM_HEARD")]);
+    expect(r.last.action).toEqual({ kind: "CONFIRM_HEARD" });
+    expect(r.state.unclearCount).toBe(1);
+    expect(r.state.learnerTurnCount).toBe(0);
+  });
+
+  it("'Yes' continues as a normal understood turn and resets the attempt counter", () => {
+    const r = run([...started, turn("CONFIRM_HEARD"), turn("UNDERSTOOD")]);
+    expect(r.last.action).toEqual({ kind: "RESPOND", allowCorrections: true });
+    expect(r.state.unclearCount).toBe(0);
+    expect(r.state.learnerTurnCount).toBe(1);
+  });
+
+  it("'No' is treated as unclear: with the default limit the learner gets 'You can say…' next", () => {
+    const r = run([...started, turn("CONFIRM_HEARD"), turn("UNCLEAR_AUDIO")]);
+    expect(r.last.action.kind).toBe("SUGGEST_AND_MOVE_ON");
+  });
+
+  it("can never loop forever: after the limit another mid-confidence attempt gets guidance, not another question", () => {
+    for (const max of [0, 1, 2, 3]) {
+      const cfg = { ...DEFAULT_MACHINE_CONFIG, unclearMaxRetries: max };
+      const r = run([...started, ...Array(max + 1).fill(turn("CONFIRM_HEARD"))], cfg);
+      expect(r.last.action.kind).toBe("SUGGEST_AND_MOVE_ON");
+    }
+  });
+
+  it("is never asked while wrapping up", () => {
+    const r = run([...started, { type: "active_time", seconds: 300 }, turn("CONFIRM_HEARD")]);
+    expect(r.last.action).toEqual({ kind: "CLOSE_ONLY" });
+  });
+});

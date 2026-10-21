@@ -95,7 +95,7 @@ Key prompt rules (abridged — full prompt in `content/prompts/turn.v{n}.md`):
 | G1b Level check | RMS too low / clipping | `NO_SPEECH` with mic tip |
 | G2 Phantom-phrase filter | Transcript empty, matches a blocklist (e.g. ご視聴ありがとうございました, チャンネル登録…, "Thank you for watching"), repetition loop, or script mismatch (Latin-only output for Japanese audio that the learner didn't intend as English) **[E]** | `NO_SPEECH` |
 | G3 Language check | Detected language ∉ {target, en, hi} or language probability < τ_lang | `UNCLEAR_AUDIO` |
-| G4 Confidence | Mean word confidence < τ_mean, or > 40% of content words below τ_word | `UNCLEAR_AUDIO` |
+| G4 Confidence | Mean word confidence ≥ τ_mean (0.70) and ≤ 40% of words below τ_word → proceed. **0.40 ≤ mean < 0.70** (or too many low words) → `CONFIRM_HEARD`: ask "Did you say 「…」?" (Yes/No) instead of rejecting — accented learners are often recognised roughly right at low confidence (measured 0.37–0.65). Mean < 0.40 → `UNCLEAR_AUDIO` | `CONFIRM_HEARD` / `UNCLEAR_AUDIO` |
 | G4b Low-confidence spans | Words below τ_word are marked as **ASR-risk spans** and passed to the LLM; corrections touching them (±1 word) are later dropped | — |
 
 Thresholds (τ_lang, τ_mean, τ_word) are **per language × STT provider**, calibrated in Phase 2 on the evaluation set ([13 §3](13-testing-and-evaluation.md)). Note the trade-off: Bohus & Rudnicky found ~40% of rejections were false rejections — thresholds that are too strict cause needless "didn't catch that" loops **[E]**. Calibrate for: unclear-rate on clean learner speech ≤ 10%, while phantom/garbled transcripts are rejected ≥ 95%.
@@ -103,6 +103,8 @@ Thresholds (τ_lang, τ_mean, τ_word) are **per language × STT provider**, cal
 If the chosen STT provides **no** confidence signal (e.g. OpenAI `gpt-transcribe` **[V]**), G4/G4b fall back to: second-opinion STT on short clips, and treating disagreement as unclear — which is why the STT choice favours providers with word confidence ([05 §3](05-voice-and-speech-architecture.md)).
 
 **STT prompt rule:** never put the *expected answer* in the STT prompt/keywords — it biases recognition toward the correct sentence and hides learner errors **[E]**. Use a neutral instruction ("verbatim transcript of a language learner; keep mistakes and hesitations") where the provider supports one, and validate with the error-preservation test ([13](13-testing-and-evaluation.md)).
+
+**Real-user finding (2026-10-22):** a clear self-introduction was heard as 「こんにちはカールテクです」 at 0.62 confidence and rejected as "I couldn't catch this". The confirm tier fixes this without ever pretending to understand: the learner's own "Yes" resolves the uncertainty. τ values remain provisional until calibrated on real learner audio.
 
 ### 4.2 LLM classification
 

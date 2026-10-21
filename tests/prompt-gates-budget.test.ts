@@ -106,3 +106,29 @@ describe("prompt: names and clarification rules", () => {
     expect(sys).toMatch(/ONE short confirmation question that quotes what you heard/);
   });
 });
+
+describe("gates: the confirm tier (accented speech must not be rejected outright)", () => {
+  const gate = (conf: number | number[]) =>
+    applyGates({ speechMs: 2000, clipMs: 3000 }, stt("こんにちは カールテク です", conf), { minSpeechMs: 400, allowedLangs: ["ja", "en", "hi"] });
+
+  it("confident → proceed", () => expect(gate(0.9).rejected).toBeNull());
+  it("plausible but not trustworthy (the user's real 0.62 case) → ask 'Did you say …?'", () => {
+    const g = gate(0.62);
+    expect(g.rejected).toBe("CONFIRM_HEARD");
+    expect(g.reason).toBe("confirm_heard");
+  });
+  it("hopelessly unsure → still just unclear", () => {
+    expect(gate(0.3).rejected).toBe("UNCLEAR_AUDIO");
+    expect(gate(0.3).reason).toBe("low_confidence");
+  });
+  it("the boundaries sit at 0.4 and 0.7", () => {
+    expect(gate(0.41).rejected).toBe("CONFIRM_HEARD");
+    expect(gate(0.39).rejected).toBe("UNCLEAR_AUDIO");
+    expect(gate(0.71).rejected).toBeNull();
+    expect(gate(0.69).rejected).toBe("CONFIRM_HEARD");
+  });
+  it("nothing to show (no letters) is never offered for confirmation", () => {
+    const g = applyGates({ speechMs: 2000, clipMs: 3000 }, { text: "…", words: [{ w: "…", conf: 0.5 }], lang: "ja", langConf: null }, { minSpeechMs: 400, allowedLangs: ["ja"] });
+    expect(g.rejected).toBe("UNCLEAR_AUDIO");
+  });
+});

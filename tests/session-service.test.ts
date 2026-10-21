@@ -416,3 +416,105 @@ describe("clarification the learner can follow", () => {
     expect(spoken.join("")).not.toContain("聞こえませんでした");
   });
 });
+
+describe("Did you say …? (confirming an uncertain transcript)", () => {
+  const goodOut = (sentences = ["こんにちは、カールテクさん！", "今日は何について話しましょうか？"]) => ({
+    analysis: { category: "understood", meaning_summary: "greeting with name", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
+    reply: { recast: null, sentences, translation: [], teach_phrase: null },
+    hints: { hint: "h", starter: "s", example: "e", example_translation: "t" }, words_introduced: [],
+  });
+  const mid = () => stt("こんにちは カールテク です", 0.62);
+
+  function make(sttScript: ConstructorParameters<typeof FakeStt>[0]) {
+    const s = new FakeStt(sttScript);
+    const llm = new FakeLlm(() => goodOut());
+    const spend = new MemorySpendStore();
+    let i = 0;
+    const svc = new SessionService({ store: new MemorySessionStore(), stt: s, llm, tts: new DemoTts(), spend, config: loadConfig({}), now: () => 1_000_000, newId: () => `id-${++i}` });
+    return { svc, s, llm, spend };
+  }
+  const begin = async (svc: SessionService) => {
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    return sessionId;
+  };
+
+  it("shows the heard text tentatively, asks the question aloud, and never calls the LLM yet", async () => {
+    const { svc, llm } = make([mid()]);
+    const id = await begin(svc);
+    const r = await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    expect(r.events.find((e) => e.t === "transcript")).toMatchObject({ display: "confirm", text: "こんにちはカールテクです" });
+    expect(r.events.find((e) => e.t === "category")).toMatchObject({ category: "CONFIRM_HEARD", action: "CONFIRM_HEARD" });
+    expect(r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : []))).toEqual(["「こんにちはカールテクです」と聞こえました。合っていますか？"]);
+    expect(llm.calls).toHaveLength(0);
+  });
+
+  it("Yes: the same turn continues; Yuki answers; speech-to-text is not paid for twice", async () => {
+    const { svc, s, llm, spend } = make([mid()]);
+    const id = await begin(svc);
+    const ask = await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    const askTurnId = (ask.events.find((e) => e.t === "transcript") as { turnId: string }).turnId;
+    const afterAsk = await spend.monthToDate(monthKey(new Date(1_000_000)));
+    const r = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
+    expect(s.calls).toBe(1);
+    expect(r.events.find((e) => e.t === "transcript")).toMatchObject({ display: "normal", text: "こんにちはカールテクです" });
+    expect(r.events.find((e) => e.t === "transcript")).toHaveProperty("turnId", askTurnId); // same bubble as the question, not a new one
+    expect(r.events.find((e) => e.t === "category")).toMatchObject({ category: "UNDERSTOOD" });
+    expect(r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : [])).join("")).toContain("カールテクさん");
+    // The model sees the ORIGINAL question, not our "合っていますか？" prompt, and is told the learner confirmed.
+    expect(llm.calls[0].user).toContain("Your last question (expects open): 今日は何について話しましょうか？");
+    expect(llm.calls[0].user).not.toContain("合っていますか");
+    expect(llm.calls[0].user).toContain("CONFIRMED");
+    expect(await spend.monthToDate(monthKey(new Date(1_000_000)))).toBeGreaterThan(afterAsk); // the LLM call
+  });
+
+  it("No (mid-conversation): treated as unclear, and the learner is guided ('You can say…') instead of asked again", async () => {
+    const { svc, llm } = make([mid()]);
+    const id = await begin(svc);
+    await collect(svc.handleEvent(id, { e: "topic_chip", label: "食べ物" }));
+    await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    const r = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: false }));
+    expect(r.events.find((e) => e.t === "transcript")).toMatchObject({ display: "unclear", text: null });
+    expect(r.events.find((e) => e.t === "category")).toMatchObject({ action: "SUGGEST_AND_MOVE_ON" });
+    expect(llm.calls).toHaveLength(0);
+  });
+
+  it("No (while choosing a topic): Yuki picks the topic, so nobody is stuck", async () => {
+    const { svc } = make([mid()]);
+    const id = await begin(svc);
+    await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    const r = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: false }));
+    expect(r.events.find((e) => e.t === "category")).toMatchObject({ action: "SURPRISE_TOPIC" });
+  });
+
+  it("the confirmation can be answered only once (a retried click does nothing)", async () => {
+    const { svc, llm } = make([mid()]);
+    const id = await begin(svc);
+    await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
+    const again = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
+    expect(again.events.some((e) => e.t === "sentence")).toBe(false);
+    expect(llm.calls).toHaveLength(1);
+  });
+
+  it("ignoring the buttons and speaking again supersedes the question; a Yes arriving later does nothing", async () => {
+    const { svc, llm } = make([mid(), stt("私 は ラーメン が 好き です", 0.95)]);
+    const id = await begin(svc);
+    await collect(svc.handleTurn(id, audio, "audio/webm", speech)); // asks to confirm
+    const next = await collect(svc.handleTurn(id, audio, "audio/webm", speech)); // learner just speaks again, confidently
+    expect(next.events.find((e) => e.t === "category")).toMatchObject({ category: "UNDERSTOOD" });
+    const stale = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
+    expect(stale.events.some((e) => e.t === "sentence")).toBe(false);
+    expect(llm.calls).toHaveLength(1);
+  });
+
+  it("stats: the confirmation prompt is not counted as a turn or as an unclear moment; the Yes is one turn", async () => {
+    const { svc } = make([mid()]);
+    const id = await begin(svc);
+    await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
+    await collect(svc.handleEvent(id, { e: "end" }));
+    const s = await svc.summarise(id);
+    expect(s.stats).toMatchObject({ turns: 1, unclearTurns: 0 });
+  });
+});

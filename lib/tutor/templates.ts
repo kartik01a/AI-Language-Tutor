@@ -71,6 +71,8 @@ export function templateFor(action: PolicyAction, ctx: { example?: Spoken; silen
       return [PROVIDER_ERROR];
     case "DECLINE_AND_REDIRECT":
       return [DECLINE];
+    case "CONFIRM_HEARD":
+      return null; // built from the heard text by the caller (confirmLine)
     case "CLOSE_ONLY":
       return [];
     case "NONE":
@@ -82,3 +84,14 @@ export function templateFor(action: PolicyAction, ctx: { example?: Spoken; silen
 }
 
 export const NUDGE_LINE = NUDGE;
+
+/** Strip spacing and trailing punctuation so the heard text reads naturally inside a quote. */
+export function tidyHeard(text: string): string {
+  return text.replace(/\s+/g, "").replace(/[。．.!！?？、,]+$/u, "");
+}
+
+/** "I heard 「…」. Is that right?": asked when recognition was plausible but not trustworthy. */
+export function confirmLine(heard: string): Spoken {
+  const t = tidyHeard(heard);
+  return { text: `「${t}」と聞こえました。合っていますか？`, translation: `I heard “${t}”. Is that right?` };
+}

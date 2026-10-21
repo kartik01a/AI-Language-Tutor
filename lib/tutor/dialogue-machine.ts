@@ -189,7 +189,8 @@ function learnerTurn(
   if (!ACTIVE_PHASES.has(state.phase)) return done(state, NONE);
 
   const category = event.category;
-  const countsAsTurn = category !== "PROVIDER_ERROR" && category !== "META_REQUEST";
+  // A confirmation prompt is not a turn: the learner's "Yes" is the turn that counts.
+  const countsAsTurn = category !== "PROVIDER_ERROR" && category !== "META_REQUEST" && category !== "CONFIRM_HEARD";
 
   let s: DialogueState = {
     ...state,
@@ -208,13 +209,17 @@ function learnerTurn(
   switch (category) {
     case "NO_SPEECH":
     case "UNCLEAR_AUDIO":
-    case "AMBIGUOUS": {
+    case "AMBIGUOUS":
+    case "CONFIRM_HEARD": {
       // Never clarify while wrapping up: just close politely.
       if (s.wrapUp) return done(s, { kind: "CLOSE_ONLY" }, true);
       if (s.unclearCount < cfg.unclearMaxRetries) {
+        // Every confirmation prompt uses up an attempt, so it can never loop forever.
         return done(
           { ...s, unclearCount: s.unclearCount + 1 },
-          { kind: "CLARIFY", variant: s.unclearCount === 0 ? "rephrase" : "simplify" },
+          category === "CONFIRM_HEARD"
+            ? { kind: "CONFIRM_HEARD" }
+            : { kind: "CLARIFY", variant: s.unclearCount === 0 ? "rephrase" : "simplify" },
         );
       }
       // Retry limit reached: model an answer and move on, never a dead end (D-17).

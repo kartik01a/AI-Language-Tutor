@@ -36,6 +36,14 @@ export interface TurnInput {
   mime: string;
   clip: ClipInfo;
   target: "ja" | "de" | "en";
+  /**
+   * Continue a turn whose transcript the learner has already confirmed ("Did you say …?" → Yes):
+   * skips speech-to-text and the confidence gates, which are what asked for the confirmation.
+   * Word confidences are kept, so corrections on shaky words stay blocked.
+   */
+  precomputed?: { asr: SttResult; gate: GateOutcome };
+  /** Treat a pre-computed transcript as rejected (the learner answered "No"). */
+  rejectAs?: "UNCLEAR_AUDIO";
   prompt: Omit<PromptContext, "asr" | "gate" | "allowedActions">;
 }
 
@@ -107,9 +115,17 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
     };
   };
 
-  // 1. Speech to text. Provider failure is NOT the learner's fault.
+  // 0. The learner answered a "Did you say …?" prompt.
+  if (input.precomputed && input.rejectAs) {
+    return finish(input.rejectAs, { asr: input.precomputed.asr, gate: input.precomputed.gate, gateReason: "learner_rejected_transcript" });
+  }
+
+  // 1. Speech to text (skipped when the learner already confirmed a transcript).
+  //    A provider failure is NOT the learner's fault.
   let asr: SttResult;
-  try {
+  if (input.precomputed) {
+    asr = input.precomputed.asr;
+  } else {
     if (input.clip.speechMs < deps.minSpeechMs || input.clip.clipMs < 800) {
       // Don't even pay for STT on silence (docs/06 G1).
       return finish("NO_SPEECH", { gateReason: "too_short_or_silent" });
@@ -117,21 +133,23 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
     const t0 = Date.now();
     try {
       asr = await deps.stt.transcribe(input.audio, input.mime, [input.target, "en"]);
+    } catch {
+      return finish("PROVIDER_ERROR");
     } finally {
       timings.sttMs = Date.now() - t0;
     }
-  } catch {
-    return finish("PROVIDER_ERROR");
   }
 
-  // 2. Deterministic gates.
-  const gate = applyGates(input.clip, asr, { minSpeechMs: deps.minSpeechMs, allowedLangs: [input.target, "en", "hi"], thresholds: deps.thresholds });
-  if (gate.rejected) return finish(gate.rejected, { asr, gate, gateReason: gate.reason });
+  // 2. Deterministic gates (already passed, with the learner's confirmation, for a pre-computed transcript).
+  const gate = input.precomputed
+    ? input.precomputed.gate
+    : applyGates(input.clip, asr, { minSpeechMs: deps.minSpeechMs, allowedLangs: [input.target, "en", "hi"], thresholds: deps.thresholds });
+  if (gate.rejected && !input.precomputed) return finish(gate.rejected, { asr, gate, gateReason: gate.reason });
 
   // 3. LLM turn call (analysis first), with one repair retry on invalid JSON.
   let out: TurnOutput;
   try {
-    const prompt = buildTurnPrompt({ ...input.prompt, asr, gate, allowedActions: [] });
+    const prompt = buildTurnPrompt({ ...input.prompt, asr, gate, allowedActions: [], confirmed: !!input.precomputed && !input.rejectAs });
     const t0 = Date.now();
     try {
       out = await callLlmWithRepair(deps.llm, prompt, usage);

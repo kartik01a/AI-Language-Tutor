@@ -61,6 +61,8 @@ export interface PromptContext {
   asr: SttResult;
   gate: GateOutcome;
   allowedActions: string[];
+  /** The learner answered "Yes" to "Did you say …?" for this transcript. */
+  confirmed?: boolean;
 }
 
 export function buildTurnPrompt(ctx: PromptContext): { system: string; user: string } {
@@ -85,6 +87,7 @@ export function buildTurnPrompt(ctx: PromptContext): { system: string; user: str
     `Learner transcript (word(confidence)): ${annotateTranscript(ctx.asr)}`,
     `Recogniser: mean confidence ${gate.meanConf === null ? "unknown" : gate.meanConf.toFixed(2)}; low-confidence word positions: ${gate.riskSpans.length ? gate.riskSpans.map(([s, e]) => (e - s === 1 ? `${s}` : `${s}-${e - 1}`)).join(", ") : "none"}`,
     "",
+    ctx.confirmed ? "The learner CONFIRMED that this transcript is what they said (the recogniser was unsure, so you asked). Treat the words as correct; do not ask again whether you heard them right." : "",
     `Allowed actions this turn: ${ctx.allowedActions.join(", ") || "any"}`,
   ]
     .filter((l) => l !== "")

@@ -12,6 +12,8 @@ export interface Message {
   text: string;
   translation?: string;
   unclear?: boolean;
+  /** Tentative: waiting for the learner's "Yes, that's what I said". */
+  confirming?: boolean;
   /** Dev-only: why a turn was rejected (what was heard, confidence, clip stats). */
   diagnostic?: TurnDiagnostic;
   /** Set on learner messages once the correction pipeline has produced cards. */
@@ -23,6 +25,8 @@ export interface UiState {
   messages: Message[];
   chips: { label: string; hint: string }[];
   needsTopic: boolean;
+  /** Turn id of the message currently asking "Did you say …?" (buttons are shown on it). */
+  confirmTurnId: string | null;
   hint: { level: number; text: string; translation?: string } | null;
   wrapUp: boolean;
   error: string | null;
@@ -31,13 +35,14 @@ export interface UiState {
 }
 
 export const initialUi: UiState = {
-  phase: "intro", messages: [], chips: [], needsTopic: true, hint: null, wrapUp: false, error: null, endReason: null, sessionId: null,
+  phase: "intro", messages: [], chips: [], needsTopic: true, confirmTurnId: null, hint: null, wrapUp: false, error: null, endReason: null, sessionId: null,
 };
 
 export type Action =
   | { type: "phase"; phase: Phase }
   | { type: "chips"; chips: UiState["chips"] }
   | { type: "message"; message: Message }
+  | { type: "confirm_clear" }
   | { type: "hint"; hint: UiState["hint"] }
   | { type: "cards"; turnId: string; cards: CorrectionCard[] }
   | { type: "topic_chosen" }
@@ -54,8 +59,20 @@ export function reducer(s: UiState, a: Action): UiState {
       return { ...s, phase: a.phase, hint: a.phase === "recording" ? null : s.hint };
     case "chips":
       return { ...s, chips: a.chips };
-    case "message":
-      return { ...s, messages: [...s.messages, a.message] };
+    case "message": {
+      // A message with an existing id REPLACES it: the learner's answer to "Did you say …?" turns the
+      // tentative bubble into the real one instead of adding a duplicate.
+      const i = s.messages.findIndex((m) => m.id === a.message.id);
+      const messages = i >= 0 ? s.messages.map((m, j) => (j === i ? a.message : m)) : [...s.messages, a.message];
+      return { ...s, messages, confirmTurnId: a.message.confirming ? a.message.id : s.confirmTurnId === a.message.id ? null : s.confirmTurnId };
+    }
+    case "confirm_clear":
+      // The learner ignored the buttons and spoke again: the old question is withdrawn.
+      return {
+        ...s,
+        confirmTurnId: null,
+        messages: s.messages.map((m) => (m.id === s.confirmTurnId ? { ...m, confirming: false, unclear: true, text: "(I couldn't catch this)" } : m)),
+      };
     case "hint":
       return { ...s, hint: a.hint };
     case "cards":

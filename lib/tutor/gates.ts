@@ -7,6 +7,8 @@ import { isPhantomTranscript } from "./output-validation";
 export interface GateThresholds {
   tauWord: number;
   tauMean: number;
+  /** Below tauMean but at least this: plausible enough to ask "Did you say …?" instead of rejecting. */
+  tauConfirm: number;
   tauLang: number;
   /** Fraction of content words below tauWord that makes the whole clip "unclear". */
   maxLowFraction: number;
@@ -16,6 +18,7 @@ export interface GateThresholds {
 export const DEFAULT_THRESHOLDS: GateThresholds = {
   tauWord: 0.6,
   tauMean: 0.7,
+  tauConfirm: 0.4,
   tauLang: 0.5,
   maxLowFraction: 0.4,
   borderlineBand: 0.05,
@@ -28,7 +31,7 @@ export interface ClipInfo {
 
 export interface GateOutcome {
   /** Set when a gate rejects the turn before the LLM sees it. */
-  rejected: "NO_SPEECH" | "UNCLEAR_AUDIO" | null;
+  rejected: "NO_SPEECH" | "UNCLEAR_AUDIO" | "CONFIRM_HEARD" | null;
   reason: string | null;
   /** Token-index spans [start, end) the recogniser was unsure about. */
   riskSpans: [number, number][];
@@ -80,7 +83,10 @@ export function applyGates(
 
   const out = { riskSpans, confidenceKnown: true, meanConf: mean };
   if (mean < t.tauMean || low / asr.words.length > t.maxLowFraction) {
-    return { ...out, borderline: false, rejected: "UNCLEAR_AUDIO", reason: "low_confidence" };
+    // Plausible but not trustworthy → ask the learner to confirm what we heard. Only when there is
+    // something to show and the recogniser was not hopelessly unsure.
+    const worthConfirming = mean >= t.tauConfirm && /[\p{L}\p{N}]/u.test(asr.text);
+    return { ...out, borderline: false, rejected: worthConfirming ? "CONFIRM_HEARD" : "UNCLEAR_AUDIO", reason: worthConfirming ? "confirm_heard" : "low_confidence" };
   }
   return { ...out, borderline: mean < t.tauMean + t.borderlineBand, rejected: null, reason: null };
 }

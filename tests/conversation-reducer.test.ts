@@ -32,3 +32,44 @@ describe("conversation reducer", () => {
     expect(reducer(s, { type: "ended", reason: "time" })).toMatchObject({ phase: "ended", endReason: "time" });
   });
 });
+
+describe("confirmation bubble", () => {
+  const confirming = { id: "t1", role: "learner" as const, text: "こんにちは", confirming: true };
+
+  it("a tentative bubble shows the buttons for its turn", () => {
+    const s = reducer(initialUi, { type: "message", message: confirming });
+    expect(s.confirmTurnId).toBe("t1");
+    expect(s.messages).toHaveLength(1);
+  });
+
+  it("the answer REPLACES the same bubble (no duplicate) and clears the question", () => {
+    let s = reducer(initialUi, { type: "message", message: confirming });
+    s = reducer(s, { type: "message", message: { id: "t1", role: "learner", text: "こんにちは" } });
+    expect(s.messages).toHaveLength(1);
+    expect(s.messages[0].confirming).toBeUndefined();
+    expect(s.confirmTurnId).toBeNull();
+  });
+
+  it("a 'No' replaces it with the unclear bubble", () => {
+    let s = reducer(initialUi, { type: "message", message: confirming });
+    s = reducer(s, { type: "message", message: { id: "t1", role: "learner", text: "(I couldn't catch this)", unclear: true } });
+    expect(s.messages[0]).toMatchObject({ unclear: true });
+    expect(s.confirmTurnId).toBeNull();
+  });
+
+  it("speaking again withdraws an unanswered question", () => {
+    let s = reducer(initialUi, { type: "message", message: confirming });
+    s = reducer(s, { type: "confirm_clear" });
+    expect(s.confirmTurnId).toBeNull();
+    expect(s.messages[0]).toMatchObject({ confirming: false, unclear: true });
+  });
+
+  it("other messages are unaffected, and ordering is preserved", () => {
+    let s = reducer(initialUi, { type: "message", message: { id: "a", role: "tutor", text: "x" } });
+    s = reducer(s, { type: "message", message: confirming });
+    s = reducer(s, { type: "message", message: { id: "b", role: "tutor", text: "y" } });
+    s = reducer(s, { type: "message", message: { id: "t1", role: "learner", text: "final" } });
+    expect(s.messages.map((m) => m.id)).toEqual(["a", "t1", "b"]);
+    expect(s.messages[1].text).toBe("final");
+  });
+});

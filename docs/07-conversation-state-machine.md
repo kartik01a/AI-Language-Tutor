@@ -133,6 +133,7 @@ Inputs: category, `unclear_count`, `hint_level`, phase, strictness, `wrap_up` fl
 
 | Category | Condition | Action | State changes |
 |---|---|---|---|
+| `CONFIRM_HEARD` (recognition plausible but not trustworthy: mean confidence 0.40–0.70) | `unclear_count < UNCLEAR_MAX_RETRIES` | `CONFIRM_HEARD`: show the heard text and ask "Did you say 「…」?" with Yes/No buttons; the LLM is **not** called. **Yes** → the turn continues with the stored transcript (word confidences kept, so corrections on shaky words stay blocked); **No** → treated as `UNCLEAR_AUDIO`; speaking again withdraws the question. The prompt uses up one attempt, so it can never loop. | `unclear_count++` (a prompt is not a learner turn) |
 | `NO_SPEECH` / `UNCLEAR_AUDIO` / `AMBIGUOUS` | `unclear_count < UNCLEAR_MAX_RETRIES` | `CLARIFY`: attempt 1 = rephrase request (template; echoes a recovered fragment if any; `AMBIGUOUS` gets an LLM-written confirmation question); attempt 2 (only if `UNCLEAR_MAX_RETRIES` is raised to 2) = **simpler/closed version of the question** — never a plain "please repeat" ([06 §7](06-ai-tutor-behavior.md)) | `unclear_count++` |
 | same | `unclear_count == UNCLEAR_MAX_RETRIES` | `SUGGEST_AND_MOVE_ON` — "You can say: …" + continue | `unclear_count = 0`, `hint_level = 0`, flag turn for review |
 | `UNDERSTOOD` | — | `RESPOND` (+ ≤1 recast if allowed) + correction cards | reset counters |

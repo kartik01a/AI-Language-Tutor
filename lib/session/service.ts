@@ -1,11 +1,12 @@
 import { budgetStatus, llmCost, monthKey, sttCost, ttsCost, azureBillableChars, type SpendStore } from "@/lib/limits/budget";
 import type { AppConfig } from "@/lib/config";
 import type { ServerEvent, ErrorCode, TurnDiagnostic } from "@/lib/contracts/events";
-import type { LlmProvider, SttProvider, TtsProvider } from "@/lib/providers/types";
+import type { LlmProvider, SttProvider, SttResult, TtsProvider } from "@/lib/providers/types";
+import type { GateOutcome } from "@/lib/tutor/gates";
 import { createInitialState, step } from "@/lib/tutor/dialogue-machine";
 import { processLearnerTurn } from "@/lib/tutor/turn-pipeline";
 import { fastPathRecastAllowed, runCorrectionPipeline } from "@/lib/tutor/correction-pipeline";
-import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, templateFor, type Spoken } from "@/lib/tutor/templates";
+import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, confirmLine, tidyHeard, templateFor, type Spoken } from "@/lib/tutor/templates";
 import { TUTORS } from "@/lib/tutor/tutors";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueEvent, MachineConfig, StepResult } from "@/lib/tutor/types";
@@ -65,7 +66,7 @@ export class SessionService {
     const rec: SessionRecord = {
       id: this.newId(), tutorId: tutor.id, level: input.level, strictness: input.strictness ?? "balanced",
       firstName: input.firstName ?? "Learner", state: createInitialState(), history: [], lastHints: null,
-      currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, reports: [],
+      currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, reports: [], pendingConfirm: null,
       metrics: { learnerSpeechMs: 0, learnerTurns: 0, unclearTurns: 0, providerErrors: 0, maxHintLevel: 0, hintsUsed: 0, wordsIntroduced: [] },
       skills: initialSkills(input.level), summary: null,
       endEmitted: false, rev: 0,
@@ -109,7 +110,7 @@ export class SessionService {
     await this.d.spend.add(monthKey(new Date(this.now())), usd);
   }
 
-  private async *speak(rec: SessionRecord, lines: Spoken[], role: "template" | "reply", messageId: string): AsyncGenerator<OutFrame> {
+  private async *speak(rec: SessionRecord, lines: Spoken[], role: "template" | "reply", messageId: string, trackContext = true): AsyncGenerator<OutFrame> {
     const tutor = TUTORS[rec.tutorId];
     const voice = { ...tutor.voice, rate: tutor.voice.rateByLevel[rec.level] };
     // Synthesise every sentence at once; emit them in order. The first sentence is never delayed
@@ -129,10 +130,11 @@ export class SessionService {
         audio: { format: r.format, durationMs: r.durationMs }, visemes: r.visemes,
       });
       yield { kind: "audio", bytes: r.audio };
-      rec.history.push({ role: "tutor", text: line.text } as HistoryItem);
+      // A confirmation prompt is not part of the conversation: it must not become "the last question".
+      if (trackContext) rec.history.push({ role: "tutor", text: line.text } as HistoryItem);
     }
     const last = lines[lines.length - 1];
-    if (last) rec.currentQuestion = { text: last.text, expects: "open" };
+    if (last && trackContext) rec.currentQuestion = { text: last.text, expects: "open" };
   }
 
   private *finishIfEnded(rec: SessionRecord): Generator<OutFrame> {
@@ -192,7 +194,34 @@ export class SessionService {
 
   // ---------- events ----------
 
+  /**
+   * The learner answered "Did you say …?". Yes continues the turn with the heard transcript (its word
+   * confidences are kept, so corrections on shaky words stay blocked); No is treated as unclear.
+   */
+  private async *confirmHeard(sessionId: string, yes: boolean): AsyncGenerator<OutFrame> {
+    const { rec, rev } = await this.load(sessionId);
+    const pending = rec.pendingConfirm;
+    if (rec.state.phase === "ENDED" || !pending) {
+      yield this.emit(rec, { t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner" });
+      return;
+    }
+    rec.pendingConfirm = null; // consume exactly once, even if the client retries
+    if (!(await this.d.store.put(rec, rev))) {
+      yield this.emit(rec, { t: "error", code: "STATE_CONFLICT", retryable: true, message: "Session changed elsewhere; please retry." });
+      return;
+    }
+    yield* this.handleTurn(sessionId, new Uint8Array(0), pending.mime, pending.clip, {
+      precomputed: { asr: pending.asr, gate: pending.gate },
+      rejectAs: yes ? undefined : "UNCLEAR_AUDIO",
+      turnId: pending.turnId,
+    });
+  }
+
   async *handleEvent(sessionId: string, ev: ClientEvent): AsyncGenerator<OutFrame> {
+    if (ev.e === "confirm_heard") {
+      yield* this.confirmHeard(sessionId, ev.yes);
+      return;
+    }
     const { rec, rev } = await this.load(sessionId);
     if (rec.state.phase === "ENDED") {
       yield this.emit(rec, { t: "error", code: "SESSION_ENDED", retryable: false, message: "This conversation has ended." });
@@ -260,14 +289,17 @@ export class SessionService {
     audio: Uint8Array,
     mime: string,
     clip: { speechMs: number; clipMs: number },
+    opts: { precomputed?: { asr: SttResult; gate: GateOutcome }; rejectAs?: "UNCLEAR_AUDIO"; turnId?: string } = {},
   ): AsyncGenerator<OutFrame> {
     const { rec, rev } = await this.load(sessionId);
+    // A fresh recording supersedes an unanswered "Did you say …?" (it already used up an attempt).
+    if (!opts.precomputed) rec.pendingConfirm = null;
     if (rec.state.phase === "ENDED") {
       yield this.emit(rec, { t: "error", code: "SESSION_ENDED", retryable: false, message: "This conversation has ended." });
       return;
     }
     const messageId = this.newId();
-    const turnId = this.newId();
+    const turnId = opts.turnId ?? this.newId();
     const started = performance.now();
     let firstAudioMs: number | null = null;
 
@@ -279,7 +311,7 @@ export class SessionService {
     const result = await processLearnerTurn(
       { stt: this.d.stt, llm: this.d.llm, machine: this.machine, minSpeechMs: this.d.config.MIN_SPEECH_MS },
       {
-        state: rec.state, audio, mime, clip, target: "ja",
+        state: rec.state, audio, mime, clip, target: "ja", precomputed: opts.precomputed, rejectAs: opts.rejectAs,
         prompt: {
           tutor, level: rec.level, strictness: rec.strictness,
           learner: { firstName: rec.firstName, recurringMistakes: [] },
@@ -293,12 +325,13 @@ export class SessionService {
     rec.state = result.state;
 
     // Costs: STT only if it was actually called; LLM per call.
-    if (result.asr) await this.addSpend(rec, sttCost("deepgram-nova-3", clip.clipMs / 1000));
+    if (result.asr && !opts.precomputed) await this.addSpend(rec, sttCost("deepgram-nova-3", clip.clipMs / 1000));
     for (const u of result.usage) await this.addSpend(rec, llmCost("gpt-6-luna", u));
 
     // What the learner sees: unclear turns never show a confident-looking transcript.
     // "Unclear" (transcript hidden) means we could not trust what was heard. When the recogniser was
     // confident and only the model wanted confirmation, the learner can see what we heard.
+    const confirming = result.category === "CONFIRM_HEARD";
     const unclear = result.category === "NO_SPEECH" || result.category === "UNCLEAR_AUDIO" || (result.category === "AMBIGUOUS" && !result.modelClarification);
     const diagnostic: TurnDiagnostic = {
       reason: result.gateReason ?? (unclear ? "model_not_confident" : null),
@@ -312,11 +345,16 @@ export class SessionService {
     // Structured log without the transcript text (docs/14): enough to debug "it didn't hear me".
     console.info("[turn]", JSON.stringify({ session: rec.id.slice(0, 8), category: result.category, action: result.action.kind, reason: diagnostic.reason, meanConf: diagnostic.meanConf, speechMs: diagnostic.speechMs, clipMs: diagnostic.clipMs, sttMs: diagnostic.sttMs, words: result.asr?.words.length ?? 0 }));
     yield this.emit(rec, {
-      t: "transcript", turnId, text: result.asr && !unclear ? result.asr.text.replace(/ /g, "") : null,
-      display: unclear ? "unclear" : "normal", riskSpans: result.gate?.riskSpans ?? [],
+      t: "transcript", turnId,
+      // While asking "Did you say …?" the heard text is shown tentatively; once confirmed it becomes the turn.
+      text: result.asr && confirming ? tidyHeard(result.asr.text) : result.asr && !unclear ? result.asr.text.replace(/ /g, "") : null,
+      display: confirming ? "confirm" : unclear ? "unclear" : "normal", riskSpans: result.gate?.riskSpans ?? [],
       ...(process.env.NODE_ENV !== "production" ? { diagnostic } : {}),
     });
-    if (result.asr && !unclear) rec.history.push({ role: "learner", text: result.asr.text.replace(/ /g, "") });
+    if (result.asr && !unclear && !confirming) rec.history.push({ role: "learner", text: result.asr.text.replace(/ /g, "") });
+    if (confirming && result.asr && result.gate) {
+      rec.pendingConfirm = { turnId, asr: result.asr, gate: result.gate, clip, mime };
+    }
     yield this.emit(rec, { t: "category", category: result.category, action: result.action.kind });
 
     if (result.analysis) {
@@ -325,7 +363,8 @@ export class SessionService {
         if (!rec.metrics.wordsIntroduced.some((x) => x.lemma === w.lemma)) rec.metrics.wordsIntroduced.push(w);
       }
     }
-    if (result.category !== "PROVIDER_ERROR") {
+    // A confirmation prompt is not a turn: the learner's "Yes" (or "No") is.
+    if (result.category !== "PROVIDER_ERROR" && !confirming) {
       rec.metrics.learnerTurns++;
       rec.metrics.learnerSpeechMs += clip.speechMs;
     }
@@ -366,7 +405,9 @@ export class SessionService {
         yield f;
       }
     };
-    if (tmpl !== null) {
+    if (confirming && result.asr) {
+      yield* timed(this.speak(rec, [confirmLine(result.asr.text)], "template", messageId, false));
+    } else if (tmpl !== null) {
       yield* timed(this.speak(rec, tmpl, "template", messageId));
     } else if (result.replySentences && result.analysis) {
       const tr = result.analysis.reply.translation;

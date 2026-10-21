@@ -77,9 +77,12 @@ export function Conversation(p: ConversationProps) {
         case "transcript":
           dispatch({
             type: "message",
-            message: { id: e.turnId, role: "learner", text: e.display === "unclear" ? "(I couldn't catch this)" : (e.text ?? ""), unclear: e.display === "unclear", diagnostic: e.diagnostic },
+            message: {
+              id: e.turnId, role: "learner", text: e.display === "unclear" ? "(I couldn't catch this)" : (e.text ?? ""),
+              unclear: e.display === "unclear", confirming: e.display === "confirm", diagnostic: e.diagnostic,
+            },
           });
-          dispatch({ type: "topic_chosen" });
+          if (e.display !== "confirm") dispatch({ type: "topic_chosen" });
           break;
         case "category":
           if (e.category === "UNCLEAR_AUDIO" || e.category === "NO_SPEECH" || e.category === "AMBIGUOUS") ctl()?.setExpression("confused");
@@ -214,6 +217,7 @@ export function Conversation(p: ConversationProps) {
     if (phase === "tutor" || phase === "waiting") {
       if (phase === "tutor") interrupt();
       await player.current?.unlock();
+      dispatch({ type: "confirm_clear" }); // speaking again withdraws an unanswered "Did you say …?"
       rec.start();
       dispatch({ type: "phase", phase: "recording" });
       ctl()?.setState("listening");
@@ -237,6 +241,13 @@ export function Conversation(p: ConversationProps) {
     interrupt();
     turnEnded.current = false;
     void post({ e: "end" });
+  };
+  const answerConfirm = (yes: boolean) => {
+    interrupt();
+    turnEnded.current = false;
+    dispatch({ type: "phase", phase: "processing" });
+    ctl()?.setState("thinking");
+    void post({ e: "confirm_heard", yes });
   };
   const askHint = () => void (ui.hint?.level === 3 ? post({ e: "hint_request" }) : postQuiet({ e: "hint_request" }));
   const reportCard = (cardId: string) => void postQuiet({ e: "card_report", cardId, reason: "was_correct" });
@@ -333,7 +344,17 @@ export function Conversation(p: ConversationProps) {
               }`}
               lang={m.role === "tutor" || !m.unclear ? "ja" : "en"}
             >
-              {m.text}
+              {m.confirming ? <span className="italic" lang="ja">{m.text}</span> : m.text}
+              {m.confirming && ui.confirmTurnId === m.id && (
+                <div className="mt-2 flex gap-2" data-testid="confirm-buttons">
+                  <button onClick={() => answerConfirm(true)} className="rounded-full bg-indigo-600 px-3 py-1 text-sm text-white">
+                    ✓ Yes, that&apos;s right
+                  </button>
+                  <button onClick={() => answerConfirm(false)} className="rounded-full border border-neutral-400 px-3 py-1 text-sm text-neutral-900">
+                    ✗ No, I&apos;ll say it again
+                  </button>
+                </div>
+              )}
               {m.unclear && m.diagnostic && (
                 <div className="mt-1 text-xs not-italic text-neutral-500" data-testid="diagnostic">
                   Why: <b>{m.diagnostic.reason}</b> · heard {m.diagnostic.heard ? <>“<span lang="ja">{m.diagnostic.heard}</span>”</> : "nothing"} · confidence{" "}

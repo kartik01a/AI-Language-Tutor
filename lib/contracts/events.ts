@@ -32,7 +32,7 @@ export type ErrorCode =
   | "PAYLOAD_TOO_LARGE" | "BAD_REQUEST" | "PROVIDER_FATAL" | "INTERNAL";
 
 export type ServerEvent =
-  | { t: "transcript"; seq: number; turnId: string; text: string | null; display: "normal" | "unclear"; riskSpans: [number, number][]; diagnostic?: TurnDiagnostic }
+  | { t: "transcript"; seq: number; turnId: string; text: string | null; display: "normal" | "unclear" | "confirm"; riskSpans: [number, number][]; diagnostic?: TurnDiagnostic }
   | { t: "category"; seq: number; category: TurnCategory; action: string }
   | {
       t: "sentence"; seq: number; messageId: string; index: number; text: string; translation?: string;
@@ -49,6 +49,8 @@ export type ClientEvent =
   | { e: "start" }
   | { e: "topic_chip"; label: string }
   | { e: "hint_request" }
+  /** Answer to "Did you say …?": yes = continue with the heard text, no = treat as unclear. */
+  | { e: "confirm_heard"; yes: boolean }
   | { e: "card_report"; cardId: string; reason: "was_correct" | "misheard" | "other" }
   | { e: "silence_timeout" }
   | { e: "end" };

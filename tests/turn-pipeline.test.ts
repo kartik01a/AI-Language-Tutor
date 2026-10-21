@@ -180,3 +180,40 @@ describe("model-driven clarification (found when a clear self-introduction was r
     expect(r.replySentences).toBeNull();
   });
 });
+
+describe("confirming a transcript (Did you say …?)", () => {
+  const midConf = () => stt("こんにちは カールテク です", 0.62);
+
+  it("mid-confidence speech is NOT interpreted: the LLM is never called, we ask the learner", async () => {
+    const l = new FakeLlm([llmOut()]);
+    const r = await processLearnerTurn(deps(new FakeStt([midConf()]), l), base());
+    expect(r.category).toBe("CONFIRM_HEARD");
+    expect(r.action).toEqual({ kind: "CONFIRM_HEARD" });
+    expect(l.calls).toHaveLength(0);
+    expect(r.asr?.text).toBe("こんにちは カールテク です");
+  });
+
+  it("'Yes' continues with the stored transcript: no second STT call, shaky word confidences preserved", async () => {
+    const s = new FakeStt([midConf()]);
+    const l = new FakeLlm([llmOut()]);
+    const d = deps(s, l);
+    const first = await processLearnerTurn(d, base());
+    const second = await processLearnerTurn(d, { ...base(first.state), precomputed: { asr: first.asr!, gate: first.gate! } });
+    expect(s.calls).toBe(1); // speech-to-text ran only once
+    expect(second.category).toBe("UNDERSTOOD");
+    expect(second.action.kind).toBe("RESPOND");
+    expect(l.calls[0].user).toContain("カールテク(0.62)"); // the LLM still sees how unsure the recogniser was
+    expect(l.calls[0].user).toContain("CONFIRMED that this transcript is what they said");
+    expect(second.state.unclearCount).toBe(0);
+  });
+
+  it("'No' is treated as unclear and never reaches the LLM", async () => {
+    const l = new FakeLlm([llmOut()]);
+    const d = deps(new FakeStt([midConf()]), l);
+    const first = await processLearnerTurn(d, base());
+    const second = await processLearnerTurn(d, { ...base(first.state), precomputed: { asr: first.asr!, gate: first.gate! }, rejectAs: "UNCLEAR_AUDIO" });
+    expect(second.category).toBe("UNCLEAR_AUDIO");
+    expect(second.action.kind).toBe("SUGGEST_AND_MOVE_ON"); // the confirmation used the one retry
+    expect(l.calls).toHaveLength(0);
+  });
+});

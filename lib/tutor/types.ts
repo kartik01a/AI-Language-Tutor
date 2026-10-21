@@ -4,6 +4,7 @@ export type TurnCategory =
   | "NO_SPEECH"
   | "UNCLEAR_AUDIO"
   | "AMBIGUOUS"
+  | "CONFIRM_HEARD"
   | "UNDERSTOOD"
   | "UNDERSTOOD_OFF_TOPIC"
   | "L1_HELP_REQUEST"
@@ -77,6 +78,8 @@ export type PolicyAction =
   | { kind: "NONE" }
   | { kind: "GREET_AND_ASK_TOPIC" }
   | { kind: "CLARIFY"; variant: "rephrase" | "simplify" }
+  /** Recognition was plausible but not trustworthy: show what we heard and ask "Did you say …?" */
+  | { kind: "CONFIRM_HEARD" }
   | { kind: "SUGGEST_AND_MOVE_ON"; flagForReview: true }
   | { kind: "SURPRISE_TOPIC"; flagForReview: true }
   | { kind: "RESPOND"; allowCorrections: boolean }
