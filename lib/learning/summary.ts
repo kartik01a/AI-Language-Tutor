@@ -4,6 +4,7 @@ import type { CorrectionCard } from "@/lib/tutor/correction-pipeline";
 import { initialEstimate, isQualifyingSession, likelyRange, updateEstimate, type CefrBand, type SkillEstimate } from "./level-estimate";
 import { evidenceFor, SKILLS, type SkillName } from "./evidence";
 import type { SessionMetrics } from "@/lib/session/store";
+import { strictJsonSchema } from "@/lib/providers/json-schema";
 
 // End-of-session analysis (docs/08 §4): verify → summarise → level update.
 
@@ -12,6 +13,9 @@ const summarySchema = z.object({
   did_well: z.array(z.object({ text: z.string().min(1).max(160), evidence: z.string().min(1).max(120) })).max(5),
   next_focus: z.string().max(160),
 });
+
+export const VERIFY_SCHEMA = { name: "verify_corrections", jsonSchema: strictJsonSchema(verifySchema) };
+export const SUMMARY_SCHEMA = { name: "session_summary", jsonSchema: strictJsonSchema(summarySchema) };
 
 export type Skills = Record<SkillName, SkillEstimate>;
 
@@ -54,6 +58,9 @@ export interface SummaryInput {
   endReason: string;
   learnerLines: string[];
   cards: CorrectionCard[];
+  /** The full sentence each card came from. The verifier must judge a fragment in context. */
+  sentences?: Record<string, string>;
+  level?: string;
   reportedCardIds: Set<string>;
   metrics: SessionMetrics;
   skills: Skills;
@@ -72,8 +79,13 @@ export async function summariseSession(input: SummaryInput): Promise<{ summary: 
   if (candidates.length > 0) {
     try {
       const r = await input.llm.turn({
-        system: "VERIFY CORRECTIONS. For each correction decide whether the learner's original is a genuine error that the corrected form fixes, and the correction is not merely a stylistic preference or a valid alternative. Be strict: agree only when clearly an error. Return JSON {\"verdicts\":[{card_id, agree}]}.",
-        user: candidates.map((c) => `${c.id}: "${c.original}" → "${c.corrected}" [${c.errorCode}]`).join("\n"),
+        system: "VERIFY CORRECTIONS. Each correction comes with the FULL sentence the learner said. Judge the fragment IN THE CONTEXT of that whole sentence: agree only if, in this sentence, the original is a genuine error that the corrected form fixes (not a stylistic preference, not a valid alternative, not a different but acceptable meaning). If it is acceptable in this sentence, do not agree. Return JSON {\"verdicts\":[{card_id, agree}]}.",
+        user: [
+          input.level ? `Learner level: ${input.level}` : "",
+          ...candidates.map((c) => `Sentence: ${input.sentences?.[c.id] ?? "(unknown)"}\n${c.id}: "${c.original}" → "${c.corrected}" [${c.errorCode}]`),
+        ].filter(Boolean).join("\n"),
+        schema: VERIFY_SCHEMA,
+        effort: "low",
       });
       usage.push(r.usage);
       const parsed = verifySchema.safeParse(r.json);
@@ -98,6 +110,8 @@ export async function summariseSession(input: SummaryInput): Promise<{ summary: 
       const r = await input.llm.turn({
         system: "SESSION SUMMARY. Give 1–3 specific things the learner did well, each with `evidence`: an exact short quote from the learner's lines. Do not invent praise. Also give one `next_focus` suggestion. Return JSON {\"did_well\":[{text, evidence}],\"next_focus\":string}.",
         user: `Learner lines:\n${input.learnerLines.map((l) => `- ${l}`).join("\n")}\nVerified fixes: ${fixes.map((f) => f.errorCode).join(", ") || "none"}`,
+        schema: SUMMARY_SCHEMA,
+        effort: "low",
       });
       usage.push(r.usage);
       const parsed = summarySchema.safeParse(r.json);

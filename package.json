@@ -14,6 +14,7 @@
     "avatars:placeholder": "node scripts/make-placeholder-avatar.mjs"
   },
   "dependencies": {
+    "microsoft-cognitiveservices-speech-sdk": "^1.52.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -28,6 +29,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
   }

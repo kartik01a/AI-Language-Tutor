@@ -3,6 +3,7 @@ import { createInitialState, step } from "./dialogue-machine";
 import { applyGates, hasNonTargetTokens, type ClipInfo, type GateOutcome, type GateThresholds } from "./gates";
 import { buildTurnPrompt, type PromptContext } from "./prompt";
 import { reconcileCategory, turnOutputSchema, type LlmCategory, type TurnOutput } from "./schemas";
+import { strictJsonSchema } from "@/lib/providers/json-schema";
 import type { DialogueState, MachineConfig, PolicyAction, TurnCategory } from "./types";
 import { validateReply } from "./output-validation";
 
@@ -51,6 +52,8 @@ export interface TurnResult {
   replyIssues: string[];
   usage: LlmUsage[];
   gateReason: string | null;
+  /** Wall-clock ms spent in each provider call (null when the stage didn't run). */
+  timings: { sttMs: number | null; llmMs: number | null };
 }
 
 const LLM_REPLY_ACTIONS = new Set([
@@ -58,9 +61,12 @@ const LLM_REPLY_ACTIONS = new Set([
   "MODEL_ANSWER_AND_MOVE_ON", "SUGGEST_AND_MOVE_ON", "EXPLAIN_WORD",
 ]);
 
+export const TURN_SCHEMA = { name: "turn_output", jsonSchema: strictJsonSchema(turnOutputSchema) };
+
 async function callLlmWithRepair(llm: LlmProvider, req: { system: string; user: string }, usage: LlmUsage[]) {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await llm.turn(req);
+    // Latency-critical: no reasoning (docs/04 §4).
+    const r = await llm.turn({ ...req, schema: TURN_SCHEMA, effort: "none" });
     usage.push(r.usage);
     const parsed = turnOutputSchema.safeParse(r.json);
     if (parsed.success) return parsed.data;
@@ -70,6 +76,7 @@ async function callLlmWithRepair(llm: LlmProvider, req: { system: string; user: 
 
 export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Promise<TurnResult> {
   const usage: LlmUsage[] = [];
+  const timings: TurnResult["timings"] = { sttMs: null, llmMs: null };
   const finish = (
     category: TurnCategory,
     extra: Partial<Pick<TurnResult, "asr" | "gate" | "analysis" | "gateReason" | "replySentences" | "replyIssues">> = {},
@@ -88,6 +95,7 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
       replyIssues: [],
       usage,
       gateReason: null,
+      timings,
       ...extra,
     };
   };
@@ -99,7 +107,12 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
       // Don't even pay for STT on silence (docs/06 G1).
       return finish("NO_SPEECH", { gateReason: "too_short_or_silent" });
     }
-    asr = await deps.stt.transcribe(input.audio, input.mime, [input.target, "en"]);
+    const t0 = Date.now();
+    try {
+      asr = await deps.stt.transcribe(input.audio, input.mime, [input.target, "en"]);
+    } finally {
+      timings.sttMs = Date.now() - t0;
+    }
   } catch {
     return finish("PROVIDER_ERROR");
   }
@@ -112,7 +125,12 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
   let out: TurnOutput;
   try {
     const prompt = buildTurnPrompt({ ...input.prompt, asr, gate, allowedActions: [] });
-    out = await callLlmWithRepair(deps.llm, prompt, usage);
+    const t0 = Date.now();
+    try {
+      out = await callLlmWithRepair(deps.llm, prompt, usage);
+    } finally {
+      timings.llmMs = Date.now() - t0;
+    }
   } catch {
     return finish("PROVIDER_ERROR", { asr, gate });
   }

@@ -5,6 +5,14 @@ import type { CorrectionCard } from "@/lib/tutor/correction-pipeline";
 // Server → client events (docs/11 §3.3). Audio travels in separate binary frames that follow
 // the `sentence` event they belong to.
 
+/** Per-stage timings of one learner turn (ms). firstAudioMs is measured from the start of the request. */
+export interface TurnLatency {
+  sttMs: number | null;
+  llmMs: number | null;
+  firstAudioMs: number | null;
+  totalMs: number;
+}
+
 export type ErrorCode =
   | "SESSION_NOT_FOUND" | "SESSION_ENDED" | "SESSION_NOT_ENDED" | "STATE_CONFLICT" | "BUDGET_PAUSED"
   | "PAYLOAD_TOO_LARGE" | "BAD_REQUEST" | "PROVIDER_FATAL" | "INTERNAL";
@@ -19,7 +27,7 @@ export type ServerEvent =
   | { t: "corrections"; seq: number; turnId: string; cards: CorrectionCard[] }
   | { t: "hint"; seq: number; level: 1 | 2 | 3; text: string; translation?: string }
   | { t: "limits"; seq: number; activeSeconds: number; wrapUp: boolean; reason: string | null }
-  | { t: "turn_end"; seq: number; stateVersion: number; expect: "learner" | "end" }
+  | { t: "turn_end"; seq: number; stateVersion: number; expect: "learner" | "end"; latency?: TurnLatency }
   | { t: "session_end"; seq: number; reason: string }
   | { t: "error"; seq: number; code: ErrorCode; retryable: boolean; message: string };
 

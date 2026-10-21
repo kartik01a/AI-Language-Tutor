@@ -1,6 +1,11 @@
 import { loadConfig } from "@/lib/config";
 import { MemorySpendStore } from "@/lib/limits/budget";
 import { DemoLlm, DemoStt, DemoTts } from "@/lib/providers/demo";
+import { AzureTts } from "@/lib/providers/azure-tts";
+import { DeepgramStt } from "@/lib/providers/deepgram";
+import { OpenAiLlm } from "@/lib/providers/openai";
+import type { LlmProvider, SttProvider, TtsProvider } from "@/lib/providers/types";
+import { warmUpSchemas } from "./warmup";
 import { SessionService, ServiceError, type OutFrame } from "@/lib/session/service";
 import { MemorySessionStore } from "@/lib/session/store";
 import { encodeAudioFrame, encodeJsonFrame } from "@/lib/contracts/frames";
@@ -13,19 +18,35 @@ import type { ErrorCode } from "@/lib/contracts/events";
 
 const g = globalThis as unknown as { __lactice?: SessionService };
 
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing ${name}. Set it in .env.local (see .env.example).`);
+  return v;
+}
+
+/** PROVIDERS=demo (default): scripted, no keys. PROVIDERS=real: Deepgram + OpenAI + Azure. */
+export function buildProviders(env: NodeJS.ProcessEnv = process.env): { stt: SttProvider; llm: LlmProvider; tts: TtsProvider; mode: "demo" | "real" } {
+  if (env.PROVIDERS !== "real") return { stt: new DemoStt(), llm: new DemoLlm(), tts: new DemoTts(), mode: "demo" };
+  return {
+    mode: "real",
+    stt: new DeepgramStt({ apiKey: requireEnv("DEEPGRAM_API_KEY") }),
+    // Hedging: a backup request after 4 s tames OpenAI's heavy latency tail (we saw 11–15 s outliers).
+    llm: new OpenAiLlm({ apiKey: requireEnv("OPENAI_API_KEY"), model: env.OPENAI_MODEL_TURN || "gpt-6-luna", hedgeAfterMs: 4000, timeoutMs: 15000 }),
+    tts: new AzureTts({ key: requireEnv("AZURE_SPEECH_KEY"), region: requireEnv("AZURE_SPEECH_REGION") }),
+  };
+}
+
 export function getService(): SessionService {
-  if (process.env.NODE_ENV === "production" && process.env.PROVIDERS !== "real") {
-    throw new Error("Demo providers are disabled in production; real providers are not wired yet.");
+  // No authentication exists yet: this runtime spends real money per request, so it must never be
+  // reachable from the public internet. Remove this guard only together with auth (docs/09 §6).
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_INSECURE_PRODUCTION !== "i-understand-there-is-no-auth") {
+    throw new Error("Refusing to start in production: authentication is not implemented yet.");
   }
-  if (process.env.PROVIDERS === "real") throw new Error("Real providers are not implemented yet.");
-  return (g.__lactice ??= new SessionService({
-    store: new MemorySessionStore(),
-    stt: new DemoStt(),
-    llm: new DemoLlm(),
-    tts: new DemoTts(),
-    spend: new MemorySpendStore(),
-    config: loadConfig(),
-  }));
+  return (g.__lactice ??= (() => {
+    const p = buildProviders();
+    if (p.mode === "real") void warmUpSchemas(p.llm); // fire and forget
+    return new SessionService({ store: new MemorySessionStore(), stt: p.stt, llm: p.llm, tts: p.tts, spend: new MemorySpendStore(), config: loadConfig() });
+  })());
 }
 
 /** Streams generator frames as the length-prefixed binary protocol (docs/11 §3.2). */

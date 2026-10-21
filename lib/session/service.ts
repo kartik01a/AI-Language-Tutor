@@ -65,7 +65,7 @@ export class SessionService {
     const rec: SessionRecord = {
       id: this.newId(), tutorId: tutor.id, level: input.level, strictness: input.strictness ?? "balanced",
       firstName: input.firstName ?? "Learner", state: createInitialState(), history: [], lastHints: null,
-      currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, corrections: [], reports: [], errorCounts: {},
+      currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, reports: [],
       metrics: { learnerSpeechMs: 0, learnerTurns: 0, unclearTurns: 0, providerErrors: 0, maxHintLevel: 0, hintsUsed: 0, wordsIntroduced: [] },
       skills: initialSkills(input.level), summary: null,
       endEmitted: false, rev: 0,
@@ -111,14 +111,22 @@ export class SessionService {
 
   private async *speak(rec: SessionRecord, lines: Spoken[], role: "template" | "reply", messageId: string): AsyncGenerator<OutFrame> {
     const tutor = TUTORS[rec.tutorId];
+    const voice = { ...tutor.voice, rate: tutor.voice.rateByLevel[rec.level] };
+    // Synthesise every sentence at once; emit them in order. The first sentence is never delayed
+    // by the others, and later ones are ready by the time the previous finishes playing.
+    const pending = lines.map((line) => {
+      const p = this.d.tts.synthesize(line.text, voice);
+      p.catch(() => {}); // a later failure surfaces when we reach that sentence, never as an unhandled rejection
+      return p;
+    });
     let index = 0;
-    for (const line of lines) {
-      const voice = { ...tutor.voice, rate: tutor.voice.rateByLevel[rec.level] };
-      const r = await this.d.tts.synthesize(line.text, voice);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const r = await pending[i];
       await this.addSpend(rec, ttsCost("azure-standard", azureBillableChars(line.text)));
       yield this.emit(rec, {
         t: "sentence", messageId, index: index++, text: line.text, translation: line.translation, role,
-        audio: { format: "wav", durationMs: r.durationMs }, visemes: r.visemes,
+        audio: { format: r.format, durationMs: r.durationMs }, visemes: r.visemes,
       });
       yield { kind: "audio", bytes: r.audio };
       rec.history.push({ role: "tutor", text: line.text } as HistoryItem);
@@ -155,11 +163,16 @@ export class SessionService {
 
     const reported = new Set(rec.reports.map((r) => r.cardId));
     const m = rec.metrics;
+    const stored = await this.d.store.listCorrections(rec.id);
+    const sentences: Record<string, string> = {};
+    for (const e of stored) for (const c of e.cards) sentences[c.id] = e.learnerText;
     const { summary, usage } = await summariseSession({
       llm: this.d.llm,
       endReason: rec.state.endReason ?? "time",
       learnerLines: rec.history.filter((h) => h.role === "learner").map((h) => h.text),
-      cards: rec.corrections.flatMap((c) => c.cards),
+      cards: stored.flatMap((c) => c.cards),
+      sentences,
+      level: rec.level,
       reportedCardIds: reported,
       metrics: m,
       skills: rec.skills,
@@ -255,6 +268,8 @@ export class SessionService {
     }
     const messageId = this.newId();
     const turnId = this.newId();
+    const started = performance.now();
+    let firstAudioMs: number | null = null;
 
     this.accrueTime(rec);
     const b = await budgetStatus(this.d.spend, this.d.config.AI_MONTHLY_BUDGET_USD, new Date(this.now()));
@@ -307,7 +322,9 @@ export class SessionService {
     const allowCorrections =
       result.category === "UNDERSTOOD" && result.asr !== null && result.gate !== null &&
       (result.action.kind === "RESPOND" || result.action.kind === "ACKNOWLEDGE_REPETITION") && result.action.allowCorrections;
-    const recurrent = new Set(Object.entries(rec.errorCounts).filter(([, n]) => n >= 2).map(([c]) => c));
+    const counts: Record<string, number> = {};
+    for (const entry of await this.d.store.listCorrections(rec.id)) for (const c of entry.cards) counts[c.errorCode] = (counts[c.errorCode] ?? 0) + 1;
+    const recurrent = new Set(Object.entries(counts).filter(([, n]) => n >= 2).map(([c]) => c));
     const correctionsP = allowCorrections && result.asr && result.gate
       ? runCorrectionPipeline(this.d.llm, {
           words: result.asr.words, lang: "ja", level: rec.level, strictness: rec.strictness,
@@ -328,23 +345,19 @@ export class SessionService {
     // What the tutor says: a template for recovery actions, the validated LLM reply otherwise.
     const example = rec.lastHints ? { text: rec.lastHints.example, translation: rec.lastHints.example_translation } : undefined;
     const tmpl = templateFor(result.action, { example, silent: result.category === "NO_SPEECH" });
+    // First audio = the moment the first audio frame is ready to leave the server.
+    const timed = async function* (gen: AsyncGenerator<OutFrame>): AsyncGenerator<OutFrame> {
+      for await (const f of gen) {
+        if (f.kind === "audio" && firstAudioMs === null) firstAudioMs = Math.round(performance.now() - started);
+        yield f;
+      }
+    };
     if (tmpl !== null) {
-      yield* this.speak(rec, tmpl, "template", messageId);
+      yield* timed(this.speak(rec, tmpl, "template", messageId));
     } else if (result.replySentences && result.analysis) {
       const tr = result.analysis.reply.translation;
       const lines: Spoken[] = result.replySentences.map((text, i) => ({ text, translation: tr[i] ?? "" }));
-      yield* this.speak(rec, recast ? [recast, ...lines] : lines, "reply", messageId);
-    }
-
-    if (correctionsP) {
-      const out = await correctionsP;
-      if (out) {
-        for (const u of out.usage) await this.addSpend(rec, llmCost("gpt-6-luna", u));
-        const cards = out.cards.map((c) => ({ ...c, id: `${turnId}-${c.id}` }));
-        for (const c of cards) rec.errorCounts[c.errorCode] = (rec.errorCounts[c.errorCode] ?? 0) + 1;
-        rec.corrections.push({ turnId, learnerText: result.asr?.text.replace(/ /g, "") ?? "", cards, dropped: out.dropped });
-        if (cards.length > 0) yield this.emit(rec, { t: "corrections", turnId, cards });
-      }
+      yield* timed(this.speak(rec, recast ? [recast, ...lines] : lines, "reply", messageId));
     }
 
     if (result.action.kind === "PROVIDER_FATAL") {
@@ -358,8 +371,25 @@ export class SessionService {
 
     yield this.emit(rec, { t: "limits", activeSeconds: Math.round(rec.state.activeSeconds), wrapUp: rec.state.wrapUp, reason: rec.state.wrapUpReason });
     yield* this.finishIfEnded(rec);
-    yield this.emit(rec, { t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner" });
     yield* this.persist(rec, rev);
+    yield this.emit(rec, {
+      t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner",
+      latency: { sttMs: result.timings.sttMs, llmMs: result.timings.llmMs, firstAudioMs, totalMs: Math.round(performance.now() - started) },
+    });
+
+    // Corrections finish after the learner can already speak again (docs/11 §3.4 allows this): the
+    // stream stays open for them. They go to their own store, so they never contend with the next turn.
+    if (correctionsP) {
+      const out = await correctionsP;
+      if (out) {
+        // Correction-call cost goes to the global monthly spend (the kill switch); per-session cost
+        // attribution moves to the usage ledger when the database store lands.
+        for (const u of out.usage) await this.d.spend.add(monthKey(new Date(this.now())), llmCost("gpt-6-luna", u));
+        const cards = out.cards.map((c) => ({ ...c, id: `${turnId}-${c.id}` }));
+        await this.d.store.addCorrection(rec.id, { turnId, learnerText: result.asr?.text.replace(/ /g, "") ?? "", cards, dropped: out.dropped });
+        if (cards.length > 0) yield this.emit(rec, { t: "corrections", turnId, cards });
+      }
+    }
   }
 }
 

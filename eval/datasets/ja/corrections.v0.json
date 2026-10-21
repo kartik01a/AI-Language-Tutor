@@ -1,0 +1,27 @@
+{
+  "version": "v0",
+  "note": "Seed set (S5, docs/13). Sentences are spoken by a synthetic voice, so this measures LLM detection precision/recall on clean ASR only. It is NOT evidence about real learner speech: replace with recorded Indian learners before relying on any number.",
+  "level": "A2",
+  "items": [
+    { "id": "err-01", "text": "昨日、友達と公園を行きました。", "expect": { "code": "ja.particle.destination", "from": "を", "to": "に" } },
+    { "id": "err-02", "text": "図書館に勉強します。", "expect": { "code": "ja.particle.location_action", "from": "に", "to": "で" } },
+    { "id": "err-03", "text": "昨日、ラーメンを食べます。", "expect": { "code": "ja.verb.tense" } },
+    { "id": "err-04", "text": "水が飲みます。", "expect": { "code": "ja.particle.object", "from": "が", "to": "を" } },
+    { "id": "err-05", "text": "昨日の映画はおもしろいでした。", "expect": { "code": "ja.adj.i_past" } },
+    { "id": "err-06", "text": "毎朝、学校を行きます。", "expect": { "code": "ja.particle.destination", "from": "を", "to": "に" } },
+    { "id": "err-07", "text": "先週、東京に行きます。", "expect": { "code": "ja.verb.tense" } },
+    { "id": "err-08", "text": "レストランに晩ご飯を食べました。", "expect": { "code": "ja.particle.location_action", "from": "に", "to": "で" } },
+    { "id": "ok-01", "text": "私はラーメンが好きです。", "expect": null },
+    { "id": "ok-02", "text": "週末は友達と映画を見ました。", "expect": null },
+    { "id": "ok-03", "text": "コーヒーのほうが好きです。", "expect": null },
+    { "id": "ok-04", "text": "明日、東京に行きます。", "expect": null },
+    { "id": "ok-05", "text": "図書館で勉強します。", "expect": null },
+    { "id": "ok-06", "text": "昨日、ラーメンを食べました。", "expect": null },
+    { "id": "ok-07", "text": "今日は天気がいいです。", "expect": null },
+    { "id": "ok-08", "text": "私は学生です。", "expect": null },
+    { "id": "ok-09", "text": "昨日の映画はおもしろかったです。", "expect": null },
+    { "id": "ok-10", "text": "毎日、公園に行きます。", "expect": null },
+    { "id": "ok-11", "text": "友達とレストランでご飯を食べました。", "expect": null },
+    { "id": "ok-12", "text": "私の趣味は料理です。", "expect": null }
+  ]
+}

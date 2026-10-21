@@ -148,3 +148,58 @@ describe("fast-path spoken recast", () => {
     expect(fastPathRecastAllowed(cand, { ...r, relaxedRecastTurn: true, recurrent: new Set(["ja.verb.tense"]) })).toBe(true);
   });
 });
+
+import { coreDiff, narrowSpan } from "@/lib/tutor/correction-pipeline";
+
+describe("core diff and span narrowing (found by the first real-provider run)", () => {
+  it("coreDiff isolates the differing part", () => {
+    expect(coreDiff("公園を行きました", "公園に行きました")).toEqual({ prefix: 2, orig: "を", corr: "に" });
+    expect(coreDiff("食べます", "食べました")).toEqual({ prefix: 3, orig: "す", corr: "した" });
+    expect(coreDiff("公園", "公園を")).toEqual({ prefix: 2, orig: "", corr: "を" }); // insertion: nothing to point at
+    expect(coreDiff("abc", "abc")).toEqual({ prefix: 3, orig: "", corr: "" });
+  });
+
+  // Real Deepgram tokens for 「公園を行きました」: note 園 has a shaky 0.81 confidence.
+  const real = words([["友", 1], ["達", 1], ["と", 1], ["公", 1], ["園", 0.81], ["を", 1], ["行き", 1], ["ま", 1], ["し", 1], ["た。", 1]]);
+
+  it("narrows a wide span to the token that actually differs (を), ignoring 園's low confidence", () => {
+    expect(narrowSpan(real, [3, 8], "公園を行きました", "公園に行きました")).toEqual([5, 6]);
+    expect(narrowSpan(real, [3, 8], "公園を行き", "公園に行き")).toEqual([5, 6]);
+  });
+
+  it("keeps the original span when the text can't be located (conservative)", () => {
+    expect(narrowSpan(real, [3, 8], "全然違う", "全然ちがう")).toEqual([3, 8]);
+  });
+
+  it("keeps the span for pure insertions, where there is no token to point at", () => {
+    expect(narrowSpan(real, [3, 6], "公園", "公園を")).toEqual([3, 6]);
+  });
+
+  it("samples that mark different span widths still vote together, and the card survives a shaky neighbour", async () => {
+    const wide = { code: "ja.particle.destination", original: "公園を行きました", corrected: "公園に行きました", token_start: 3, token_end: 8, type: "grammar" as const };
+    const narrow = { ...wide, original: "公園を行き", corrected: "公園に行き", token_end: 7 };
+    const tight = { code: "ja.particle.destination", original: "を", corrected: "に", token_start: 5, token_end: 6, type: "grammar" as const };
+    const llm = scripted([{ edits: [wide] }, { edits: [narrow] }, { edits: [tight] }]);
+    const r = await runCorrectionPipeline(llm, base({ words: real }));
+    expect(r.cards).toHaveLength(1);
+    expect(r.cards[0].errorCode).toBe("ja.particle.destination");
+    expect(r.dropped).toEqual([]);
+  });
+
+  it("but if the particle itself is shaky, it is still dropped", async () => {
+    const shaky = words([["友", 1], ["達", 1], ["と", 1], ["公", 1], ["園", 1], ["を", 0.7], ["行き", 1], ["ま", 1], ["し", 1], ["た。", 1]]);
+    const wide = { code: "ja.particle.destination", original: "公園を行きました", corrected: "公園に行きました", token_start: 3, token_end: 8, type: "grammar" as const };
+    const r = await runCorrectionPipeline(scripted(same(wide)), base({ words: shaky }));
+    expect(r.cards).toHaveLength(0);
+    expect(r.dropped.map((d) => d.reason)).toEqual(["fragile_confidence"]);
+  });
+
+  it("the detection prompt now carries each category's rule and an example", async () => {
+    const llm = scripted(same({ edits: [] }).map(() => ({ edits: [] })));
+    await runCorrectionPipeline(llm, base());
+    expect(llm.calls[0].system).toContain("Use に (or へ) after places you go to.");
+    expect(llm.calls[0].system).toContain("公園を行きました");
+    expect(llm.calls[0].schema?.name).toBe("edit_candidates");
+    expect(llm.calls[0].effort).toBe("low"); // detection can think: it runs after the learner is released
+  });
+});

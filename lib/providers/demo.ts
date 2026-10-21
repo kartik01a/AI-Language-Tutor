@@ -99,6 +99,6 @@ export class DemoTts implements TtsProvider {
     const shapes = kanaToShapes(speakable.replace(/[^぀-ヿー]/g, "あ"));
     const visemes = Array.from({ length: n }, (_, i) => ({ t: i * moraMs, v: shapes[i % Math.max(1, shapes.length)] ?? "a" }));
     const durationMs = n * moraMs + 150;
-    return { audio: makeToneWav(300 + (text.length % 5) * 40, durationMs, 22050, 0.15), visemes, durationMs, billableChars: text.length };
+    return { format: "wav" as const, audio: makeToneWav(300 + (text.length % 5) * 40, durationMs, 22050, 0.15), visemes, durationMs, billableChars: text.length };
   }
 }

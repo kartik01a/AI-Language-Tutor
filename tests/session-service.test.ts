@@ -233,7 +233,7 @@ describe("corrections in the live session", () => {
     return { ...s, sessionId };
   }
 
-  it("a genuine particle error gets a card (answer hidden first), arriving with the same turn", async () => {
+  it("a genuine particle error gets a card (answer hidden first), delivered after the turn has ended", async () => {
     const { svc, sessionId } = await started();
     await turn(svc, sessionId); // 1: clear, no error
     await turn(svc, sessionId); // 2: unclear
@@ -242,7 +242,8 @@ describe("corrections in the live session", () => {
     expect(c && c.t === "corrections" && c.cards).toHaveLength(1);
     const card = c && c.t === "corrections" ? c.cards[0] : null;
     expect(card).toMatchObject({ errorCode: "ja.particle.destination", original: "を", corrected: "に", tryAgainFirst: true });
-    expect(r.types.indexOf("corrections")).toBeLessThan(r.types.indexOf("turn_end"));
+    // Cards arrive AFTER turn_end so the learner can already answer while they are computed.
+    expect(r.types.indexOf("corrections")).toBeGreaterThan(r.types.indexOf("turn_end"));
   });
 
   it("correct sentences and unclear turns produce no cards", async () => {
@@ -283,6 +284,38 @@ describe("corrections in the live session", () => {
     expect(c && c.t === "corrections" && c.cards[0].tryAgainFirst).toBe(false);
     const rep = await collect(s.svc.handleEvent(sessionId, { e: "card_report", cardId: "x", reason: "was_correct" }));
     expect(rep.types).toContain("turn_end");
+  });
+
+  it("slow corrections never hold the learner back, and the next turn can start while they are computed", async () => {
+    const s = setup();
+    const internals = s.svc as unknown as { d: { llm: { turn: (r: { system: string }) => Promise<unknown> } } };
+    const orig = internals.d.llm.turn.bind(internals.d.llm);
+    internals.d.llm.turn = async (req) => {
+      if (req.system.startsWith("EDIT DETECTION")) await new Promise((r) => setTimeout(r, 150));
+      return orig(req);
+    };
+    const { sessionId } = await s.svc.createSession({ level: "A2" });
+    await collect(s.svc.handleEvent(sessionId, { e: "start" }));
+    await collect(s.svc.handleEvent(sessionId, { e: "topic_chip", label: "週末" }));
+    await turn(s.svc, sessionId);
+    await turn(s.svc, sessionId);
+
+    // Turn 3 has the particle error. Read its stream manually so we can act at turn_end.
+    const gen = s.svc.handleTurn(sessionId, audio, "audio/webm", speech);
+    const seen: { t: string; at: number }[] = [];
+    const t0 = Date.now();
+    let nextTurn: Promise<{ types: string[]; events: ServerEvent[] }> | null = null;
+    for await (const f of gen) {
+      if (f.kind !== "event") continue;
+      seen.push({ t: f.event.t, at: Date.now() - t0 });
+      if (f.event.t === "turn_end") nextTurn = turn(s.svc, sessionId); // the learner answers straight away
+    }
+    const turnEnd = seen.find((e) => e.t === "turn_end");
+    const corr = seen.find((e) => e.t === "corrections");
+    expect(corr && turnEnd && corr.at - turnEnd.at).toBeGreaterThanOrEqual(100);
+    const next = await nextTurn;
+    expect(next?.events.some((e) => e.t === "error")).toBe(false); // no STATE_CONFLICT from the late write
+    expect(next?.types).toContain("turn_end");
   });
 
   it("a failing correction pipeline never breaks the conversation", async () => {

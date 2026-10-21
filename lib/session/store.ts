@@ -42,10 +42,7 @@ export interface SessionRecord {
   lastActivityAt: number;
   seq: number;
   costUsd: number;
-  corrections: CorrectionRecord[];
   reports: { cardId: string; reason: string }[];
-  /** Times each error code was shown this session (≥2 counts as recurrent). */
-  errorCounts: Record<string, number>;
   metrics: SessionMetrics;
   /** Per-skill level estimates (in-memory in the demo; persisted per learner once the DB is wired). */
   skills: Skills;
@@ -57,6 +54,13 @@ export interface SessionRecord {
 }
 
 export interface SessionStore {
+  /**
+   * Corrections are append-only and live OUTSIDE the session record: they are produced after the
+   * learner's turn has finished, so they must never contend with the next turn's revision check
+   * (in Postgres this is simply inserts into the corrections table).
+   */
+  addCorrection(sessionId: string, entry: CorrectionRecord): Promise<void>;
+  listCorrections(sessionId: string): Promise<CorrectionRecord[]>;
   get(id: string): Promise<SessionRecord | null>;
   /** Stores the record only if the stored revision still equals `expectedRev`. */
   put(rec: SessionRecord, expectedRev: number): Promise<boolean>;
@@ -65,6 +69,13 @@ export interface SessionStore {
 
 export class MemorySessionStore implements SessionStore {
   private m = new Map<string, SessionRecord>();
+  private corr = new Map<string, CorrectionRecord[]>();
+  async addCorrection(sessionId: string, entry: CorrectionRecord) {
+    this.corr.set(sessionId, [...(this.corr.get(sessionId) ?? []), structuredClone(entry)]);
+  }
+  async listCorrections(sessionId: string) {
+    return structuredClone(this.corr.get(sessionId) ?? []);
+  }
   async get(id: string) {
     const r = this.m.get(id);
     return r ? structuredClone(r) : null;

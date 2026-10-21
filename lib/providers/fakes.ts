@@ -29,7 +29,7 @@ export class FakeTts implements TtsProvider {
   calls: string[] = [];
   async synthesize(text: string): Promise<TtsResult> {
     this.calls.push(text);
-    return { audio: new Uint8Array([0xff, 0xfb]), visemes: [{ t: 0, v: "a" }], durationMs: text.length * 80, billableChars: text.length };
+    return { format: "mp3", audio: new Uint8Array([0xff, 0xfb]), visemes: [{ t: 0, v: "a" }], durationMs: text.length * 80, billableChars: text.length };
   }
 }
 

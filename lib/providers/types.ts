@@ -32,6 +32,10 @@ export interface LlmRequest {
   system: string;
   /** Per-turn dynamic content. */
   user: string;
+  /** Strict output schema (JSON Schema). Providers that support it enforce the shape. */
+  schema?: { name: string; jsonSchema: Record<string, unknown> };
+  /** Reasoning effort: "none" for latency-critical tutor turns, "low" for end-of-session analysis. */
+  effort?: "none" | "low" | "medium";
 }
 
 export interface LlmProvider {
@@ -49,6 +53,7 @@ export interface VoiceConfig {
 
 export interface TtsResult {
   audio: Uint8Array;
+  format: "mp3" | "wav";
   visemes: VisemeEvent[];
   durationMs: number;
   billableChars: number;

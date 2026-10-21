@@ -143,3 +143,19 @@ describe("evidence mapping is conservative", () => {
     expect(evidenceFor("fluency", 2.5, { metrics: m({ learnerSpeechMs: 160_000 }), verifiedCards: 0 })).toBeGreaterThan(2.5);
   });
 });
+
+describe("verifier sees the whole sentence (found by the first real-provider run)", () => {
+  it("gives the verifier the full sentence for every card, and the learner's level", async () => {
+    const llm = route({ verdicts: [{ card_id: "c1", agree: true }, { card_id: "c2", agree: true }] });
+    await summariseSession({
+      ...base(llm),
+      sentences: { c1: "昨日友達と公園を行きました", c2: "昨日ラーメンを食べます" },
+      level: "A2",
+    });
+    const verify = llm.calls.find((c) => c.system.startsWith("VERIFY"));
+    expect(verify?.user).toContain("Sentence: 昨日友達と公園を行きました");
+    expect(verify?.user).toContain("Sentence: 昨日ラーメンを食べます");
+    expect(verify?.user).toContain("Learner level: A2");
+    expect(verify?.system).toMatch(/IN THE CONTEXT of that whole sentence/);
+  });
+});
