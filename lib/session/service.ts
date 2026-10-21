@@ -297,7 +297,9 @@ export class SessionService {
     for (const u of result.usage) await this.addSpend(rec, llmCost("gpt-6-luna", u));
 
     // What the learner sees: unclear turns never show a confident-looking transcript.
-    const unclear = result.category === "NO_SPEECH" || result.category === "UNCLEAR_AUDIO" || result.category === "AMBIGUOUS";
+    // "Unclear" (transcript hidden) means we could not trust what was heard. When the recogniser was
+    // confident and only the model wanted confirmation, the learner can see what we heard.
+    const unclear = result.category === "NO_SPEECH" || result.category === "UNCLEAR_AUDIO" || (result.category === "AMBIGUOUS" && !result.modelClarification);
     const diagnostic: TurnDiagnostic = {
       reason: result.gateReason ?? (unclear ? "model_not_confident" : null),
       heard: result.asr?.text ?? null,
@@ -356,7 +358,7 @@ export class SessionService {
 
     // What the tutor says: a template for recovery actions, the validated LLM reply otherwise.
     const example = rec.lastHints ? { text: rec.lastHints.example, translation: rec.lastHints.example_translation } : undefined;
-    const tmpl = templateFor(result.action, { example, silent: result.category === "NO_SPEECH" });
+    const tmpl = result.modelClarification ? null : templateFor(result.action, { example, silent: result.category === "NO_SPEECH" });
     // First audio = the moment the first audio frame is ready to leave the server.
     const timed = async function* (gen: AsyncGenerator<OutFrame>): AsyncGenerator<OutFrame> {
       for await (const f of gen) {

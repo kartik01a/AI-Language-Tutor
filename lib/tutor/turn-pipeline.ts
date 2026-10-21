@@ -50,6 +50,12 @@ export interface TurnResult {
   /** Reply text only when the action uses the LLM's reply (never for templates). */
   replySentences: string[] | null;
   replyIssues: string[];
+  /**
+   * True when the model itself judged the turn partially understood, so its reply is a targeted
+   * confirmation question to speak instead of the generic "say it again" template. NOT set when code
+   * downgraded the model's "understood" (borderline confidence): that reply assumed understanding.
+   */
+  modelClarification: boolean;
   usage: LlmUsage[];
   gateReason: string | null;
   /** Wall-clock ms spent in each provider call (null when the stage didn't run). */
@@ -93,6 +99,7 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
       analysis: null,
       replySentences: null,
       replyIssues: [],
+      modelClarification: false,
       usage,
       gateReason: null,
       timings,
@@ -157,6 +164,16 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
   if (LLM_REPLY_ACTIONS.has(result.action.kind)) {
     const check = validateReply(out.reply.sentences, { lang: input.target, level: input.prompt.level });
     result.replySentences = out.reply.sentences;
+    result.replyIssues = check.issues;
+  }
+  const modelClarifies = result.action.kind === "CLARIFY" && category === "AMBIGUOUS" && out.analysis.category === "partially_understood";
+  if (modelClarifies) {
+    const check = validateReply(out.reply.sentences, { lang: input.target, level: input.prompt.level });
+    // Only a well-formed single confirmation question is spoken; anything else falls back to the template.
+    if (check.ok) {
+      result.modelClarification = true;
+      result.replySentences = out.reply.sentences;
+    }
     result.replyIssues = check.issues;
   }
   return result;

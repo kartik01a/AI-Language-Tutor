@@ -143,3 +143,40 @@ describe("turn pipeline", () => {
     expect(r.replySentences).toBeNull();
   });
 });
+
+describe("model-driven clarification (found when a clear self-introduction was rejected)", () => {
+  const partial = (sentences: string[]) => llmOut({ category: "partially_understood", meaning_summary: "greeting; name unclear" }, sentences);
+
+  it("when the model itself is unsure, its targeted confirmation question is used, not the generic template", async () => {
+    const r = await processLearnerTurn(deps(new FakeStt([stt("こんにちは、 カルテック です", 0.92)]), new FakeLlm([partial(["「カルテック」はお名前ですか？"])])), base());
+    expect(r.category).toBe("AMBIGUOUS");
+    expect(r.action).toEqual({ kind: "CLARIFY", variant: "rephrase" });
+    expect(r.modelClarification).toBe(true);
+    expect(r.replySentences).toEqual(["「カルテック」はお名前ですか？"]);
+  });
+
+  it("the unclear counter still advances, so the retry limit and 'You can say' fallback still apply", async () => {
+    const d = deps(new FakeStt([stt("こんにちは、 カルテック です", 0.92)]), new FakeLlm([partial(["「カルテック」はお名前ですか？"])]));
+    const first = await processLearnerTurn(d, base());
+    expect(first.state.unclearCount).toBe(1);
+    const second = await processLearnerTurn(d, base(first.state));
+    expect(second.action.kind).toBe("SUGGEST_AND_MOVE_ON");
+    expect(second.modelClarification).toBe(false);
+  });
+
+  it("a malformed clarification (two questions) is not spoken: the safe template is used", async () => {
+    const r = await processLearnerTurn(deps(new FakeStt([stt("こんにちは、 カルテック です", 0.92)]), new FakeLlm([partial(["お名前ですか？", "どこから来ましたか？"])])), base());
+    expect(r.category).toBe("AMBIGUOUS");
+    expect(r.modelClarification).toBe(false);
+    expect(r.replySentences).toBeNull();
+    expect(r.replyIssues).toContain("question_count");
+  });
+
+  it("if CODE downgraded the model's 'understood' (borderline audio), the model's reply is NOT used: it assumed understanding", async () => {
+    const r = await processLearnerTurn(deps(new FakeStt([stt("私 は 学生 です", 0.72)]), new FakeLlm([llmOut()])), base());
+    expect(r.gate?.borderline).toBe(true);
+    expect(r.category).toBe("AMBIGUOUS");
+    expect(r.modelClarification).toBe(false);
+    expect(r.replySentences).toBeNull();
+  });
+});

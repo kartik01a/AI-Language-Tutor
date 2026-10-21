@@ -54,3 +54,20 @@ with the full sentence it confirms genuine corrections **and rejects a deliberat
 ≈ **$0.0055** total ($0.0011–0.0017 per learner turn incl. STT + LLM + TTS + corrections). A 10-turn session extrapolates to
 ≈ $0.02, below the $0.05 modelled in docs/12 — but effort `low` detection adds reasoning tokens and caching is inactive;
 re-measure over ≥ 50 real sessions before changing the budget model.
+
+## First real-user attempt: a clear self-introduction was rejected (2026-10-22)
+User said 「こんにちは、カーティクです」; Deepgram heard 「こんにちは、カルテックです。」 at 0.90 mean confidence (all gates passed),
+but the turn was shown as "I couldn't catch this". Root causes, both in our code/prompt, neither in speech recognition:
+1. **Model inconsistency on names:** the identical input was classified `understood` in ~2/3 of runs and `partially_understood`
+   in ~1/3, because a name can't be verified. Fix: the prompt now says names/places/loanwords are accepted as heard and
+   `partially_understood` is only for genuine meaning uncertainty. After the fix: 10/10 and 6/6 `understood` on two names;
+   deliberately garbled-but-confident words are still 6/6 `partially_understood`.
+2. **Throwing away the model's own clarification:** when the model *was* unsure, its targeted confirmation question
+   (「カルテック」はお名前ですか？) was discarded in favour of the generic "say it again" template, and the transcript was
+   hidden even though recognition was confident. Now the model's single, validated confirmation question is spoken and the
+   transcript is shown. The model's reply is used **only** when the model itself was unsure — never when code downgraded an
+   "understood" answer (that reply assumed understanding).
+Also added: dev-only per-turn diagnostics (reason, heard text, confidence, speech duration) and a structured `[turn]` log.
+Note for later: accented speech does produce low word confidence (0.37–0.65 on Indian-accented synthetic voices), so the
+provisional 0.70 mean-confidence gate will need calibration on real learners; the planned "Did you say …? Yes/No" confirmation
+flow is the intended answer for that mid-confidence zone.

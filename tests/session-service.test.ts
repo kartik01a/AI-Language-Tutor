@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "@/lib/config";
 import { MemorySpendStore, monthKey } from "@/lib/limits/budget";
 import { DemoLlm, DemoStt, DemoTts } from "@/lib/providers/demo";
-import { FakeStt, stt } from "@/lib/providers/fakes";
+import { FakeLlm, FakeStt, stt } from "@/lib/providers/fakes";
 import { SessionService, ServiceError, type OutFrame } from "@/lib/session/service";
 import { MemorySessionStore } from "@/lib/session/store";
 import type { ServerEvent } from "@/lib/contracts/events";
@@ -390,5 +390,29 @@ describe("end-of-session summary", () => {
   it("an unknown session is a clear error", async () => {
     const { svc } = setup();
     await expect(svc.summarise("nope")).rejects.toMatchObject({ code: "SESSION_NOT_FOUND" });
+  });
+});
+
+describe("clarification the learner can follow", () => {
+  it("a confident transcript the model wants confirmed is shown and answered with the model's question (not 'I couldn't catch that')", async () => {
+    const out = (cat: string, sentences: string[]) => ({
+      analysis: { category: cat, meaning_summary: "greeting", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
+      reply: { recast: null, sentences, translation: [], teach_phrase: null },
+      hints: { hint: "h", starter: "s", example: "e", example_translation: "t" }, words_introduced: [],
+    });
+    let n = 0;
+    const llm = new FakeLlm(() => (n++ === 0 ? out("partially_understood", ["「カルテック」はお名前ですか？"]) : out("understood", ["いいですね！", "何が好きですか？"])));
+    const svc = new SessionService({
+      store: new MemorySessionStore(), stt: new FakeStt([stt("こんにちは、 カルテック です", 0.92)]), llm, tts: new DemoTts(),
+      spend: new MemorySpendStore(), config: loadConfig({}), now: () => 1_000_000, newId: (() => { let i = 0; return () => `id-${++i}`; })(),
+    });
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    const r = await collect(svc.handleTurn(sessionId, audio, "audio/webm", speech));
+    expect(r.events.find((e) => e.t === "transcript")).toMatchObject({ display: "normal", text: "こんにちは、カルテックです" });
+    expect(r.events.find((e) => e.t === "category")).toMatchObject({ category: "AMBIGUOUS", action: "CLARIFY" });
+    const spoken = r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : []));
+    expect(spoken).toEqual(["「カルテック」はお名前ですか？"]);
+    expect(spoken.join("")).not.toContain("聞こえませんでした");
   });
 });

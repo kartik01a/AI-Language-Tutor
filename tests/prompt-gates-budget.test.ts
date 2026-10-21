@@ -97,3 +97,12 @@ describe("budget", () => {
     expect((await budgetStatus(store, 50, new Date("2026-11-01T00:00:00Z"))).status).toBe("ok");
   });
 });
+
+describe("prompt: names and clarification rules", () => {
+  it("tells the model to accept names and to ask one confirmation question only when genuinely unsure", () => {
+    const sys = buildStaticPrefix(yuki, "A2");
+    expect(sys).toMatch(/name, place or loanword/);
+    expect(sys).toMatch(/NOT a reason to say partially_understood/);
+    expect(sys).toMatch(/ONE short confirmation question that quotes what you heard/);
+  });
+});
