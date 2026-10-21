@@ -1,4 +1,5 @@
 import type { CorrectionCard } from "@/lib/tutor/correction-pipeline";
+import type { TurnDiagnostic } from "@/lib/contracts/events";
 
 // UI state for the conversation screen (docs/02 §5.3). The server's dialogue machine owns
 // pedagogy; this only tracks what to show.
@@ -11,6 +12,8 @@ export interface Message {
   text: string;
   translation?: string;
   unclear?: boolean;
+  /** Dev-only: why a turn was rejected (what was heard, confidence, clip stats). */
+  diagnostic?: TurnDiagnostic;
   /** Set on learner messages once the correction pipeline has produced cards. */
   cards?: CorrectionCard[];
 }

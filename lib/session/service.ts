@@ -1,6 +1,6 @@
 import { budgetStatus, llmCost, monthKey, sttCost, ttsCost, azureBillableChars, type SpendStore } from "@/lib/limits/budget";
 import type { AppConfig } from "@/lib/config";
-import type { ServerEvent, ErrorCode } from "@/lib/contracts/events";
+import type { ServerEvent, ErrorCode, TurnDiagnostic } from "@/lib/contracts/events";
 import type { LlmProvider, SttProvider, TtsProvider } from "@/lib/providers/types";
 import { createInitialState, step } from "@/lib/tutor/dialogue-machine";
 import { processLearnerTurn } from "@/lib/tutor/turn-pipeline";
@@ -298,9 +298,21 @@ export class SessionService {
 
     // What the learner sees: unclear turns never show a confident-looking transcript.
     const unclear = result.category === "NO_SPEECH" || result.category === "UNCLEAR_AUDIO" || result.category === "AMBIGUOUS";
+    const diagnostic: TurnDiagnostic = {
+      reason: result.gateReason ?? (unclear ? "model_not_confident" : null),
+      heard: result.asr?.text ?? null,
+      lang: result.asr?.lang ?? null,
+      meanConf: result.gate?.meanConf ?? null,
+      speechMs: Math.round(clip.speechMs),
+      clipMs: Math.round(clip.clipMs),
+      sttMs: result.timings.sttMs,
+    };
+    // Structured log without the transcript text (docs/14): enough to debug "it didn't hear me".
+    console.info("[turn]", JSON.stringify({ session: rec.id.slice(0, 8), category: result.category, action: result.action.kind, reason: diagnostic.reason, meanConf: diagnostic.meanConf, speechMs: diagnostic.speechMs, clipMs: diagnostic.clipMs, sttMs: diagnostic.sttMs, words: result.asr?.words.length ?? 0 }));
     yield this.emit(rec, {
       t: "transcript", turnId, text: result.asr && !unclear ? result.asr.text.replace(/ /g, "") : null,
       display: unclear ? "unclear" : "normal", riskSpans: result.gate?.riskSpans ?? [],
+      ...(process.env.NODE_ENV !== "production" ? { diagnostic } : {}),
     });
     if (result.asr && !unclear) rec.history.push({ role: "learner", text: result.asr.text.replace(/ /g, "") });
     yield this.emit(rec, { t: "category", category: result.category, action: result.action.kind });

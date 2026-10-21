@@ -77,7 +77,7 @@ export function Conversation(p: ConversationProps) {
         case "transcript":
           dispatch({
             type: "message",
-            message: { id: e.turnId, role: "learner", text: e.display === "unclear" ? "(I couldn't catch this)" : (e.text ?? ""), unclear: e.display === "unclear" },
+            message: { id: e.turnId, role: "learner", text: e.display === "unclear" ? "(I couldn't catch this)" : (e.text ?? ""), unclear: e.display === "unclear", diagnostic: e.diagnostic },
           });
           dispatch({ type: "topic_chosen" });
           break;
@@ -334,6 +334,12 @@ export function Conversation(p: ConversationProps) {
               lang={m.role === "tutor" || !m.unclear ? "ja" : "en"}
             >
               {m.text}
+              {m.unclear && m.diagnostic && (
+                <div className="mt-1 text-xs not-italic text-neutral-500" data-testid="diagnostic">
+                  Why: <b>{m.diagnostic.reason}</b> · heard {m.diagnostic.heard ? <>“<span lang="ja">{m.diagnostic.heard}</span>”</> : "nothing"} · confidence{" "}
+                  {m.diagnostic.meanConf === null ? "n/a" : m.diagnostic.meanConf.toFixed(2)} · speech {(m.diagnostic.speechMs / 1000).toFixed(1)}s of {(m.diagnostic.clipMs / 1000).toFixed(1)}s
+                </div>
+              )}
               {m.translation && <div className="mt-1 text-xs text-neutral-500">{m.translation}</div>}
             </div>
             {m.cards && m.cards.length > 0 && <CorrectionCards cards={m.cards} onReport={reportCard} />}

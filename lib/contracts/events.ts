@@ -13,12 +13,26 @@ export interface TurnLatency {
   totalMs: number;
 }
 
+/**
+ * Why a turn was treated the way it was. Sent only outside production: it includes what the
+ * recogniser heard, which we must not leak into logs or analytics (docs/14).
+ */
+export interface TurnDiagnostic {
+  reason: string | null;
+  heard: string | null;
+  lang: string | null;
+  meanConf: number | null;
+  speechMs: number;
+  clipMs: number;
+  sttMs: number | null;
+}
+
 export type ErrorCode =
   | "SESSION_NOT_FOUND" | "SESSION_ENDED" | "SESSION_NOT_ENDED" | "STATE_CONFLICT" | "BUDGET_PAUSED"
   | "PAYLOAD_TOO_LARGE" | "BAD_REQUEST" | "PROVIDER_FATAL" | "INTERNAL";
 
 export type ServerEvent =
-  | { t: "transcript"; seq: number; turnId: string; text: string | null; display: "normal" | "unclear"; riskSpans: [number, number][] }
+  | { t: "transcript"; seq: number; turnId: string; text: string | null; display: "normal" | "unclear"; riskSpans: [number, number][]; diagnostic?: TurnDiagnostic }
   | { t: "category"; seq: number; category: TurnCategory; action: string }
   | {
       t: "sentence"; seq: number; messageId: string; index: number; text: string; translation?: string;
