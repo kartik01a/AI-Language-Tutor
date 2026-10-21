@@ -73,3 +73,16 @@ describe("confirmation bubble", () => {
     expect(s.messages[1].text).toBe("final");
   });
 });
+
+describe("translations", () => {
+  it("attach to the right tutor message once they arrive", () => {
+    let s = reducer(initialUi, { type: "message", message: { id: "m-0", role: "tutor", text: "いいですね！" } });
+    s = reducer(s, { type: "message", message: { id: "m-1", role: "tutor", text: "何が好きですか？" } });
+    s = reducer(s, { type: "translation", id: "m-1", text: "What do you like?" });
+    expect(s.messages.map((m) => m.translation)).toEqual([undefined, "What do you like?"]);
+  });
+  it("a translation for an unknown message is ignored", () => {
+    const s = reducer(initialUi, { type: "translation", id: "ghost", text: "x" });
+    expect(s.messages).toEqual([]);
+  });
+});

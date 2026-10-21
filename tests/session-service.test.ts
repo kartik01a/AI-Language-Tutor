@@ -396,7 +396,7 @@ describe("end-of-session summary", () => {
 describe("clarification the learner can follow", () => {
   it("a confident transcript the model wants confirmed is shown and answered with the model's question (not 'I couldn't catch that')", async () => {
     const out = (cat: string, sentences: string[]) => ({
-      analysis: { category: cat, meaning_summary: "greeting", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
+      analysis: { category: cat, topic: null, meaning_summary: "greeting", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
       reply: { recast: null, sentences, translation: [], teach_phrase: null },
       hints: { hint: "h", starter: "s", example: "e", example_translation: "t" }, words_introduced: [],
     });
@@ -417,9 +417,12 @@ describe("clarification the learner can follow", () => {
   });
 });
 
+/** Tutor-turn calls only: translation/correction/summary calls are separate requests. */
+const turnCalls = (llm: FakeLlm) => llm.calls.filter((c) => c.schema?.name === "turn_output");
+
 describe("Did you say …? (confirming an uncertain transcript)", () => {
   const goodOut = (sentences = ["こんにちは、カールテクさん！", "今日は何について話しましょうか？"]) => ({
-    analysis: { category: "understood", meaning_summary: "greeting with name", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
+    analysis: { category: "understood", topic: null, meaning_summary: "greeting with name", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
     reply: { recast: null, sentences, translation: [], teach_phrase: null },
     hints: { hint: "h", starter: "s", example: "e", example_translation: "t" }, words_introduced: [],
   });
@@ -494,7 +497,7 @@ describe("Did you say …? (confirming an uncertain transcript)", () => {
     await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
     const again = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
     expect(again.events.some((e) => e.t === "sentence")).toBe(false);
-    expect(llm.calls).toHaveLength(1);
+    expect(turnCalls(llm)).toHaveLength(1);
   });
 
   it("ignoring the buttons and speaking again supersedes the question; a Yes arriving later does nothing", async () => {
@@ -505,7 +508,7 @@ describe("Did you say …? (confirming an uncertain transcript)", () => {
     expect(next.events.find((e) => e.t === "category")).toMatchObject({ category: "UNDERSTOOD" });
     const stale = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: true }));
     expect(stale.events.some((e) => e.t === "sentence")).toBe(false);
-    expect(llm.calls).toHaveLength(1);
+    expect(turnCalls(llm)).toHaveLength(1);
   });
 
   it("stats: the confirmation prompt is not counted as a turn or as an unclear moment; the Yes is one turn", async () => {
@@ -516,5 +519,85 @@ describe("Did you say …? (confirming an uncertain transcript)", () => {
     await collect(svc.handleEvent(id, { e: "end" }));
     const s = await svc.summarise(id);
     expect(s.stats).toMatchObject({ turns: 1, unclearTurns: 0 });
+  });
+});
+
+describe("English under every tutor line", () => {
+  const turnOut = (topic: string | null, sentences: string[]) => ({
+    analysis: { category: "understood", topic, meaning_summary: "x", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
+    reply: { recast: null, sentences, translation: [], teach_phrase: null },
+    hints: { hint: "h", starter: "s", example: "e", example_translation: "t" }, words_introduced: [],
+  });
+  const mk = (route: (req: { system: string; user: string }) => unknown) => {
+    const llm = new FakeLlm((_, req) => route(req));
+    let i = 0;
+    const svc = new SessionService({
+      store: new MemorySessionStore(), stt: new FakeStt([stt("私 は ラーメン が 好き です", 0.95)]), llm, tts: new DemoTts(),
+      spend: new MemorySpendStore(), config: loadConfig({}), now: () => 1_000_000, newId: () => `id-${++i}`,
+    });
+    return { svc, llm };
+  };
+  const startTopic = async (svc: SessionService) => {
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    await collect(svc.handleEvent(sessionId, { e: "topic_chip", label: "食べ物" }));
+    return sessionId;
+  };
+
+  it("every AI-written line gets a translation event, arriving after the reply (never delaying it)", async () => {
+    const { svc } = mk((req) => (req.system.startsWith("TRANSLATE") ? { items: ["Nice!", "What do you like?"] } : turnOut("食べ物", ["いいですね！", "何が好きですか？"])));
+    const id = await startTopic(svc);
+    const r = await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    const tr = r.events.filter((e) => e.t === "translation");
+    expect(tr.map((e) => (e.t === "translation" ? e.text : ""))).toEqual(["Nice!", "What do you like?"]);
+    // They point at the right sentences.
+    const sentences = r.events.filter((e) => e.t === "sentence");
+    expect(tr.map((e) => (e.t === "translation" ? [e.messageId, e.index] : []))).toEqual(sentences.map((e) => (e.t === "sentence" ? [e.messageId, e.index] : [])));
+    expect(r.types.indexOf("translation")).toBeGreaterThan(r.types.indexOf("turn_end"));
+  });
+
+  it("scripted lines keep their own translations and cost no extra call", async () => {
+    const { svc, llm } = mk(() => turnOut("食べ物", ["いいですね！"]));
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    await collect(svc.handleEvent(sessionId, { e: "topic_chip", label: "食べ物" }));
+    expect(llm.calls).toHaveLength(0);
+  });
+
+  it("if translating fails or returns the wrong count, nothing wrong is shown and the turn still works", async () => {
+    for (const bad of [{ items: ["only one"] }, { nonsense: 1 }, new Error("down")]) {
+      const { svc } = mk((req) => { if (req.system.startsWith("TRANSLATE")) { if (bad instanceof Error) throw bad; return bad; } return turnOut("食べ物", ["いいですね！", "何が好きですか？"]); });
+      const id = await startTopic(svc);
+      const r = await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+      expect(r.events.some((e) => e.t === "translation")).toBe(false);
+      expect(r.events.some((e) => e.t === "error")).toBe(false);
+      expect(r.types).toContain("turn_end");
+    }
+  });
+});
+
+describe("topic selection stays open until the learner actually names a topic", () => {
+  const turnOut = (topic: string | null) => ({
+    analysis: { category: "understood", topic, meaning_summary: "x", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
+    reply: { recast: null, sentences: ["こんにちは！", "何を話しますか？"], translation: [], teach_phrase: null },
+    hints: { hint: "h", starter: "s", example: "e", example_translation: "t" }, words_introduced: [],
+  });
+  const run = async (topic: string | null) => {
+    const svc = new SessionService({
+      store: new MemorySessionStore(), stt: new FakeStt([stt("こんにちは、 カルテック です", 0.95)]),
+      llm: new FakeLlm((_, req) => (req.system.startsWith("TRANSLATE") ? { items: ["Hi!", "What shall we talk about?"] } : turnOut(topic))),
+      tts: new DemoTts(), spend: new MemorySpendStore(), config: loadConfig({}), now: () => 1_000_000,
+    });
+    const { sessionId } = await svc.createSession({ level: "A2" });
+    await collect(svc.handleEvent(sessionId, { e: "start" }));
+    const r = await collect(svc.handleTurn(sessionId, audio, "audio/webm", speech));
+    return r.events.find((e) => e.t === "turn_end");
+  };
+
+  it("a bare greeting/name is answered, but the topic buttons stay (server phase stays TOPIC_SELECTION)", async () => {
+    expect(await run(null)).toMatchObject({ phase: "TOPIC_SELECTION" });
+  });
+  it("naming a topic ends topic selection", async () => {
+    expect(await run("食べ物")).toMatchObject({ phase: "CONVERSATION" });
   });
 });

@@ -13,7 +13,7 @@ const inConversation = () => {
 };
 
 const llmOut = (over: Partial<TurnOutput["analysis"]> = {}, sentences = ["いいですね！", "何が好きですか？"]): TurnOutput => ({
-  analysis: { category: "understood", meaning_summary: "likes ramen", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null, ...over },
+  analysis: { category: "understood", topic: null, meaning_summary: "likes ramen", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null, ...over },
   reply: { recast: null, sentences, translation: [], teach_phrase: null },
   hints: { hint: "h", starter: "s", example: "e", example_translation: "t" },
   words_introduced: [],

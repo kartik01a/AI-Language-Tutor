@@ -6,6 +6,7 @@ import type { GateOutcome } from "@/lib/tutor/gates";
 import { createInitialState, step } from "@/lib/tutor/dialogue-machine";
 import { processLearnerTurn } from "@/lib/tutor/turn-pipeline";
 import { fastPathRecastAllowed, runCorrectionPipeline } from "@/lib/tutor/correction-pipeline";
+import { translateLines } from "@/lib/tutor/translate";
 import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, confirmLine, tidyHeard, templateFor, type Spoken } from "@/lib/tutor/templates";
 import { TUTORS } from "@/lib/tutor/tutors";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
@@ -202,7 +203,7 @@ export class SessionService {
     const { rec, rev } = await this.load(sessionId);
     const pending = rec.pendingConfirm;
     if (rec.state.phase === "ENDED" || !pending) {
-      yield this.emit(rec, { t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner" });
+      yield this.emit(rec, { t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner", phase: rec.state.phase });
       return;
     }
     rec.pendingConfirm = null; // consume exactly once, even if the client retries
@@ -278,7 +279,7 @@ export class SessionService {
 
     yield this.emit(rec, { t: "limits", activeSeconds: Math.round(rec.state.activeSeconds), wrapUp: rec.state.wrapUp, reason: rec.state.wrapUpReason });
     yield* this.finishIfEnded(rec);
-    yield this.emit(rec, { t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner" });
+    yield this.emit(rec, { t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner", phase: rec.state.phase });
     yield* this.persist(rec, rev);
   }
 
@@ -334,7 +335,7 @@ export class SessionService {
     const confirming = result.category === "CONFIRM_HEARD";
     const unclear = result.category === "NO_SPEECH" || result.category === "UNCLEAR_AUDIO" || (result.category === "AMBIGUOUS" && !result.modelClarification);
     const diagnostic: TurnDiagnostic = {
-      reason: result.gateReason ?? (unclear ? "model_not_confident" : null),
+      reason: result.providerError ? `provider_error:${result.providerError.stage}: ${result.providerError.message}` : (result.gateReason ?? (unclear ? "model_not_confident" : null)),
       heard: result.asr?.text ?? null,
       lang: result.asr?.lang ?? null,
       meanConf: result.gate?.meanConf ?? null,
@@ -344,7 +345,10 @@ export class SessionService {
     };
     // Structured log without the transcript text (docs/14): enough to debug "it didn't hear me".
     console.info("[turn]", JSON.stringify({ session: rec.id.slice(0, 8), category: result.category, action: result.action.kind, reason: diagnostic.reason, meanConf: diagnostic.meanConf, speechMs: diagnostic.speechMs, clipMs: diagnostic.clipMs, sttMs: diagnostic.sttMs, words: result.asr?.words.length ?? 0 }));
-    yield this.emit(rec, {
+    // Nothing was recognised and nothing is "unclear" (a provider failed first): there is no learner
+    // bubble to show, so don't create an empty one.
+    const nothingToShow = !result.asr && !unclear && !confirming;
+    if (!nothingToShow) yield this.emit(rec, {
       t: "transcript", turnId,
       // While asking "Did you say …?" the heard text is shown tentatively; once confirmed it becomes the turn.
       text: result.asr && confirming ? tidyHeard(result.asr.text) : result.asr && !unclear ? result.asr.text.replace(/ /g, "") : null,
@@ -386,6 +390,7 @@ export class SessionService {
       : null;
 
     // Spoken recast: only via the fast path's strict checks (never ASR-fragile, never near a risky word).
+    let translation: { messageId: string; indices: number[]; promise: Promise<Awaited<ReturnType<typeof translateLines>>> } | null = null;
     let recast: Spoken | null = null;
     if (allowCorrections && result.analysis && result.asr && result.gate && result.analysis.reply.recast) {
       const ok = fastPathRecastAllowed(result.analysis.analysis.recast_candidate, {
@@ -412,7 +417,16 @@ export class SessionService {
     } else if (result.replySentences && result.analysis) {
       const tr = result.analysis.reply.translation;
       const lines: Spoken[] = result.replySentences.map((text, i) => ({ text, translation: tr[i] ?? "" }));
-      yield* timed(this.speak(rec, recast ? [recast, ...lines] : lines, "reply", messageId));
+      const all = recast ? [recast, ...lines] : lines;
+      // English under every line: translated by a separate small request that runs while the voice plays.
+      const missing = all.map((l, i) => ({ l, i })).filter((x) => !x.l.translation);
+      if (missing.length > 0) {
+        translation = {
+          messageId, indices: missing.map((x) => x.i),
+          promise: translateLines(this.d.llm, missing.map((x) => x.l.text)),
+        };
+      }
+      yield* timed(this.speak(rec, all, "reply", messageId));
     }
 
     if (result.action.kind === "PROVIDER_FATAL") {
@@ -428,9 +442,20 @@ export class SessionService {
     yield* this.finishIfEnded(rec);
     yield* this.persist(rec, rev);
     yield this.emit(rec, {
-      t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner",
+      t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner", phase: rec.state.phase,
       latency: { sttMs: result.timings.sttMs, llmMs: result.timings.llmMs, firstAudioMs, totalMs: Math.round(performance.now() - started) },
     });
+
+    // Translations arrive while the voice is still playing (they were started before the audio).
+    if (translation) {
+      const t = await translation.promise;
+      if (t) {
+        await this.d.spend.add(monthKey(new Date(this.now())), llmCost("gpt-6-luna", t.usage));
+        for (let k = 0; k < t.items.length; k++) {
+          yield this.emit(rec, { t: "translation", messageId: translation.messageId, index: translation.indices[k], text: t.items[k] });
+        }
+      }
+    }
 
     // Corrections finish after the learner can already speak again (docs/11 §3.4 allows this): the
     // stream stays open for them. They go to their own store, so they never contend with the next turn.

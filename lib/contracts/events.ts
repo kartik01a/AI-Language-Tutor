@@ -41,7 +41,8 @@ export type ServerEvent =
   | { t: "corrections"; seq: number; turnId: string; cards: CorrectionCard[] }
   | { t: "hint"; seq: number; level: 1 | 2 | 3; text: string; translation?: string }
   | { t: "limits"; seq: number; activeSeconds: number; wrapUp: boolean; reason: string | null }
-  | { t: "turn_end"; seq: number; stateVersion: number; expect: "learner" | "end"; latency?: TurnLatency }
+  | { t: "translation"; seq: number; messageId: string; index: number; text: string }
+  | { t: "turn_end"; seq: number; stateVersion: number; expect: "learner" | "end"; /** Server phase: the topic buttons stay until it leaves TOPIC_SELECTION. */ phase: string; latency?: TurnLatency }
   | { t: "session_end"; seq: number; reason: string }
   | { t: "error"; seq: number; code: ErrorCode; retryable: boolean; message: string };
 

@@ -4,7 +4,7 @@ import { reconcileCategory, turnOutputSchema, type TurnOutput } from "@/lib/tuto
 
 const baseOut = (over: Partial<TurnOutput["analysis"]> = {}): TurnOutput => ({
   analysis: {
-    category: "understood", meaning_summary: "likes ramen", recovered_fragment: null,
+    category: "understood", topic: null, meaning_summary: "likes ramen", recovered_fragment: null,
     off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null, ...over,
   },
   reply: { recast: null, sentences: ["いいですね！", "何が好きですか？"], translation: [], teach_phrase: null },

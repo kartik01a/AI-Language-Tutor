@@ -132,3 +132,12 @@ describe("gates: the confirm tier (accented speech must not be rejected outright
     expect(g.rejected).toBe("UNCLEAR_AUDIO");
   });
 });
+
+describe("prompt: topic and translation rules", () => {
+  it("asks for a topic field and leaves translations to the separate request", () => {
+    const sys = buildStaticPrefix(yuki, "A2");
+    expect(sys).toMatch(/`topic`/);
+    expect(sys).toMatch(/greeting or their name is NOT a topic/);
+    expect(sys).toMatch(/Leave `reply.translation` as an empty array/);
+  });
+});

@@ -82,7 +82,6 @@ export function Conversation(p: ConversationProps) {
               unclear: e.display === "unclear", confirming: e.display === "confirm", diagnostic: e.diagnostic,
             },
           });
-          if (e.display !== "confirm") dispatch({ type: "topic_chosen" });
           break;
         case "category":
           if (e.category === "UNCLEAR_AUDIO" || e.category === "NO_SPEECH" || e.category === "AMBIGUOUS") ctl()?.setExpression("confused");
@@ -94,6 +93,9 @@ export function Conversation(p: ConversationProps) {
         case "corrections":
           dispatch({ type: "cards", turnId: e.turnId, cards: e.cards });
           break;
+        case "translation":
+          dispatch({ type: "translation", id: `${e.messageId}-${e.index}`, text: e.text });
+          break;
         case "hint":
           dispatch({ type: "hint", hint: { level: e.level, text: e.text, translation: e.translation } });
           break;
@@ -101,6 +103,8 @@ export function Conversation(p: ConversationProps) {
           dispatch({ type: "limits", wrapUp: e.wrapUp });
           break;
         case "turn_end":
+          // The topic buttons stay until the SERVER has a topic (a greeting or a name isn't one).
+          if (e.phase !== "TOPIC_SELECTION" && e.phase !== "INIT") dispatch({ type: "topic_chosen" });
           if (!isMuted) {
             turnEnded.current = true;
             settle();

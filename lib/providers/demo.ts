@@ -40,7 +40,7 @@ const REPLIES: { sentences: string[]; translation: string[]; hint: [string, stri
 const base = (n: number, category: TurnOutput["analysis"]["category"], teach?: { text: string; translation: string }): TurnOutput => {
   const r = REPLIES[n % REPLIES.length];
   return {
-    analysis: { category, meaning_summary: "learner answered", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
+    analysis: { category, topic: "free talk", meaning_summary: "learner answered", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
     reply: { recast: null, sentences: r.sentences, translation: r.translation, teach_phrase: teach ?? null },
     hints: { hint: r.hint[0], starter: r.hint[1], example: r.hint[2], example_translation: "(example)" },
     words_introduced: [],
@@ -65,6 +65,10 @@ export class DemoLlm implements LlmProvider {
         rule: l.includes("particle") ? "Use に after places you go to." : "Finished actions end in ～ました.",
         example: l.includes("particle") ? "学校に行きました。" : "昨日、ラーメンを食べました。",
       }));
+      return { json: { items }, usage: USAGE };
+    }
+    if (req.system.startsWith("TRANSLATE")) {
+      const items = req.user.split("\n").filter(Boolean).map((l) => `[EN] ${l.replace(/^\d+\.\s*/, "")}`);
       return { json: { items }, usage: USAGE };
     }
     if (req.system.startsWith("VERIFY CORRECTIONS")) {

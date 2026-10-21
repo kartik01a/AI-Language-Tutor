@@ -277,3 +277,21 @@ describe("confirm-what-we-heard (CONFIRM_HEARD)", () => {
     expect(r.last.action).toEqual({ kind: "CLOSE_ONLY" });
   });
 });
+
+describe("topic selection", () => {
+  it("a bare understood turn (greeting, name) does not end topic selection", () => {
+    const r = run([{ type: "greeting_sent" }, turn("UNDERSTOOD")]);
+    expect(r.state.phase).toBe("TOPIC_SELECTION");
+    expect(r.last.action).toEqual({ kind: "RESPOND", allowCorrections: false });
+  });
+  it("one that names a topic does", () => {
+    const r = run([{ type: "greeting_sent" }, turn("UNDERSTOOD", { topic: { label: "旅行", source: "spoken" } })]);
+    expect(r.state.phase).toBe("CONVERSATION");
+    expect(r.state.topic?.label).toBe("旅行");
+  });
+  it("still cannot trap the learner: repeated unclear speech makes Yuki pick a topic", () => {
+    const r = run([{ type: "greeting_sent" }, turn("UNCLEAR_AUDIO"), turn("UNCLEAR_AUDIO")]);
+    expect(r.state.phase).toBe("CONVERSATION");
+    expect(r.last.action.kind).toBe("SURPRISE_TOPIC");
+  });
+});

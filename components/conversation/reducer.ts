@@ -43,6 +43,7 @@ export type Action =
   | { type: "chips"; chips: UiState["chips"] }
   | { type: "message"; message: Message }
   | { type: "confirm_clear" }
+  | { type: "translation"; id: string; text: string }
   | { type: "hint"; hint: UiState["hint"] }
   | { type: "cards"; turnId: string; cards: CorrectionCard[] }
   | { type: "topic_chosen" }
@@ -66,6 +67,8 @@ export function reducer(s: UiState, a: Action): UiState {
       const messages = i >= 0 ? s.messages.map((m, j) => (j === i ? a.message : m)) : [...s.messages, a.message];
       return { ...s, messages, confirmTurnId: a.message.confirming ? a.message.id : s.confirmTurnId === a.message.id ? null : s.confirmTurnId };
     }
+    case "translation":
+      return { ...s, messages: s.messages.map((m) => (m.id === a.id ? { ...m, translation: a.text } : m)) };
     case "confirm_clear":
       // The learner ignored the buttons and spoke again: the old question is withdrawn.
       return {

@@ -68,7 +68,11 @@ export interface TurnResult {
   gateReason: string | null;
   /** Wall-clock ms spent in each provider call (null when the stage didn't run). */
   timings: { sttMs: number | null; llmMs: number | null };
+  /** Which provider failed and why (for logs/diagnostics; never shown to learners in production). */
+  providerError: { stage: "stt" | "llm"; message: string } | null;
 }
+
+const errorMessage = (e: unknown): string => (e instanceof Error ? e.message : String(e)).slice(0, 200);
 
 const LLM_REPLY_ACTIONS = new Set([
   "RESPOND", "ACKNOWLEDGE_REPETITION", "REPHRASE_QUESTION", "TEACH_PHRASE", "MODEL_IN_TARGET", "HINT",
@@ -93,7 +97,7 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
   const timings: TurnResult["timings"] = { sttMs: null, llmMs: null };
   const finish = (
     category: TurnCategory,
-    extra: Partial<Pick<TurnResult, "asr" | "gate" | "analysis" | "gateReason" | "replySentences" | "replyIssues">> = {},
+    extra: Partial<Pick<TurnResult, "asr" | "gate" | "analysis" | "gateReason" | "replySentences" | "replyIssues" | "providerError">> = {},
     event: Parameters<typeof step>[1] = { type: "learner_turn", category },
   ): TurnResult => {
     const r = step(input.state, event, deps.machine);
@@ -111,6 +115,7 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
       usage,
       gateReason: null,
       timings,
+      providerError: null,
       ...extra,
     };
   };
@@ -132,9 +137,14 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
     }
     const t0 = Date.now();
     try {
-      asr = await deps.stt.transcribe(input.audio, input.mime, [input.target, "en"]);
-    } catch {
-      return finish("PROVIDER_ERROR");
+      // One quick retry: most speech-to-text failures are transient network blips.
+      try {
+        asr = await deps.stt.transcribe(input.audio, input.mime, [input.target, "en"]);
+      } catch {
+        asr = await deps.stt.transcribe(input.audio, input.mime, [input.target, "en"]);
+      }
+    } catch (e) {
+      return finish("PROVIDER_ERROR", { providerError: { stage: "stt", message: errorMessage(e) } });
     } finally {
       timings.sttMs = Date.now() - t0;
     }
@@ -156,8 +166,8 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
     } finally {
       timings.llmMs = Date.now() - t0;
     }
-  } catch {
-    return finish("PROVIDER_ERROR", { asr, gate });
+  } catch (e) {
+    return finish("PROVIDER_ERROR", { asr, gate, providerError: { stage: "llm", message: errorMessage(e) } });
   }
 
   // 4. Reconcile the model's claim with the evidence, then let the machine decide.
@@ -175,6 +185,7 @@ export async function processLearnerTurn(deps: TurnDeps, input: TurnInput): Prom
       offTopicReason: out.analysis.off_topic_reason ?? undefined,
       metaKind: out.analysis.meta.kind ?? undefined,
       phrase: out.reply.teach_phrase?.text,
+      topic: out.analysis.topic ? { label: out.analysis.topic, source: "spoken" as const } : undefined,
     },
   );
 

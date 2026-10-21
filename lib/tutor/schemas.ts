@@ -18,6 +18,8 @@ export const turnCategorySchema = z.enum([
 export const turnOutputSchema = z.object({
   analysis: z.object({
     category: turnCategorySchema,
+    /** The topic the learner chose to talk about (e.g. "食べ物"), or null if they haven't chosen one yet (just a greeting, a name…). */
+    topic: z.string().nullable(),
     meaning_summary: z.string().max(200),
     recovered_fragment: z.string().nullable(),
     off_topic_reason: z.enum(["learner_steering", "misunderstood_question"]).nullable(),

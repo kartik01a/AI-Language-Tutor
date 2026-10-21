@@ -235,7 +235,8 @@ function learnerTurn(
     case "UNDERSTOOD": {
       let next = resetCounters(s);
       if (inTopicSelection) {
-        next = enterConversation(next, event.topic ?? { label: "Free conversation", source: "spoken" });
+        // Only a named topic ends topic selection: a bare greeting or a name is answered, then we ask again.
+        if (event.topic) next = enterConversation(next, event.topic);
         return done(next, { kind: "RESPOND", allowCorrections: false }, next.wrapUp);
       }
       if (next.awaitingRepetition !== null) {
@@ -252,7 +253,7 @@ function learnerTurn(
       const reason = event.offTopicReason ?? "misunderstood_question";
       if (reason === "learner_steering") {
         let next = resetCounters(s);
-        next = enterConversation(next, event.topic ?? { label: "Free conversation", source: "spoken" });
+        if (event.topic) next = enterConversation(next, event.topic);
         return done(next, { kind: "RESPOND", allowCorrections: false }, next.wrapUp);
       }
       // Likely misunderstood the question: simplify it; counters unchanged, no corrections.
