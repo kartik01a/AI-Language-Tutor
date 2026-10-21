@@ -48,10 +48,11 @@ export function AvatarLab({ svg }: { svg: string }) {
     }, end);
   };
 
-  const btn = "rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100 data-[on=true]:bg-indigo-600 data-[on=true]:text-white";
+  const btn =
+    "rounded-full border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 data-[on=true]:border-indigo-600 data-[on=true]:bg-indigo-600 data-[on=true]:text-white";
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-6 text-neutral-900">
       <h1 className="text-xl font-bold">Avatar Lab</h1>
       <p className="text-sm text-neutral-600">
         Dev-only. Drives the placeholder tutor through every state, expression and mouth shape (docs/03 §B10).

@@ -12,14 +12,10 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Light mode first (docs/01 D-35). Dark-mode tokens are added later under [data-theme="dark"]. */
 
 body {
+  color-scheme: light;
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
