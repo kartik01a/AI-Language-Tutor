@@ -1,0 +1,717 @@
+{
+ "speaker": "synth",
+ "clips": [
+  "p01",
+  "p02",
+  "p03",
+  "p04",
+  "p05",
+  "p06",
+  "p07",
+  "p08",
+  "p09",
+  "p10",
+  "p11",
+  "p12",
+  "p13",
+  "p14",
+  "p15",
+  "p16",
+  "p17",
+  "p18",
+  "p19",
+  "p20"
+ ],
+ "summary": {
+  "Deepgram nova-3 (ja)": {
+   "meanCER": 0.008333333333333333,
+   "exact": 0.95,
+   "accept": 0.95,
+   "confirm": 0.05,
+   "reject": 0,
+   "noConf": 0,
+   "errors": 0,
+   "p50": 481
+  },
+  "Deepgram nova-3 (multi)": {
+   "meanCER": 0.008333333333333333,
+   "exact": 0.95,
+   "accept": 0.95,
+   "confirm": 0.05,
+   "reject": 0,
+   "noConf": 0,
+   "errors": 0,
+   "p50": 502
+  },
+  "Azure STT ja-JP": {
+   "meanCER": 0.008333333333333333,
+   "exact": 0.95,
+   "accept": 1,
+   "confirm": 0,
+   "reject": 0,
+   "noConf": 0,
+   "errors": 0,
+   "p50": 664
+  },
+  "OpenAI gpt-transcribe": {
+   "meanCER": 0.008333333333333333,
+   "exact": 0.95,
+   "accept": 0,
+   "confirm": 0,
+   "reject": 0,
+   "noConf": 1,
+   "errors": 0,
+   "p50": 1136
+  }
+ },
+ "results": {
+  "Deepgram nova-3 (ja)": [
+   {
+    "id": "p01",
+    "text": "こんにちは",
+    "cer": 0,
+    "mean": 0.640625,
+    "gate": "CONFIRM_HEARD",
+    "ms": 2088
+   },
+   {
+    "id": "p02",
+    "text": "初めまして。よろしくお願いします。",
+    "cer": 0,
+    "mean": 0.9901801188888888,
+    "gate": "accept",
+    "ms": 2489
+   },
+   {
+    "id": "p03",
+    "text": "私は学生です。",
+    "cer": 0,
+    "mean": 0.9996093760000001,
+    "gate": "accept",
+    "ms": 926
+   },
+   {
+    "id": "p04",
+    "text": "私はインドから来ました。",
+    "cer": 0,
+    "mean": 0.9995659777777779,
+    "gate": "accept",
+    "ms": 443
+   },
+   {
+    "id": "p05",
+    "text": "私はラーメンが好きです。",
+    "cer": 0,
+    "mean": 0.9998604914285715,
+    "gate": "accept",
+    "ms": 481
+   },
+   {
+    "id": "p06",
+    "text": "コーヒーのほうが好きです。",
+    "cer": 0,
+    "mean": 0.9912109383333333,
+    "gate": "accept",
+    "ms": 480
+   },
+   {
+    "id": "p07",
+    "text": "昨日、友達と公園に行きました。",
+    "cer": 0,
+    "mean": 0.958496094,
+    "gate": "accept",
+    "ms": 547
+   },
+   {
+    "id": "p08",
+    "text": "毎朝学校に行きます。",
+    "cer": 0,
+    "mean": 0.97688802,
+    "gate": "accept",
+    "ms": 480
+   },
+   {
+    "id": "p09",
+    "text": "図書館で勉強します。",
+    "cer": 0,
+    "mean": 0.9740513428571429,
+    "gate": "accept",
+    "ms": 651
+   },
+   {
+    "id": "p10",
+    "text": "週末は映画を見ました。",
+    "cer": 0,
+    "mean": 0.9456380211111112,
+    "gate": "accept",
+    "ms": 473
+   },
+   {
+    "id": "p11",
+    "text": "今日は天気がいいです。",
+    "cer": 0,
+    "mean": 0.99664306625,
+    "gate": "accept",
+    "ms": 451
+   },
+   {
+    "id": "p12",
+    "text": "日本語を勉強しています。",
+    "cer": 0,
+    "mean": 0.9998914933333334,
+    "gate": "accept",
+    "ms": 448
+   },
+   {
+    "id": "p13",
+    "text": "東京に行きたいです。",
+    "cer": 0,
+    "mean": 0.9897460933333333,
+    "gate": "accept",
+    "ms": 1323
+   },
+   {
+    "id": "p14",
+    "text": "私の趣味は料理です。",
+    "cer": 0,
+    "mean": 1,
+    "gate": "accept",
+    "ms": 1750
+   },
+   {
+    "id": "p15",
+    "text": "すみません、もう一度お願いします。",
+    "cer": 0,
+    "mean": 0.9873046883333334,
+    "gate": "accept",
+    "ms": 837
+   },
+   {
+    "id": "p16",
+    "text": "これはいくらですか。",
+    "cer": 0,
+    "mean": 0.9983724,
+    "gate": "accept",
+    "ms": 414
+   },
+   {
+    "id": "p17",
+    "text": "駅はどこですか。",
+    "cer": 0,
+    "mean": 0.9998372400000001,
+    "gate": "accept",
+    "ms": 481
+   },
+   {
+    "id": "p18",
+    "text": "水をください。",
+    "cer": 0,
+    "mean": 0.9816080766666667,
+    "gate": "accept",
+    "ms": 416
+   },
+   {
+    "id": "p19",
+    "text": "昨日ラーメンを食べました。",
+    "cer": 0,
+    "mean": 0.9757486977777776,
+    "gate": "accept",
+    "ms": 437
+   },
+   {
+    "id": "p20",
+    "text": "来月、日本へ行きます。",
+    "cer": 0.16666666666666666,
+    "mean": 0.975195316,
+    "gate": "accept",
+    "ms": 391
+   }
+  ],
+  "Deepgram nova-3 (multi)": [
+   {
+    "id": "p01",
+    "text": "こんにちは。",
+    "cer": 0,
+    "mean": 0.97094727,
+    "gate": "accept",
+    "ms": 1875
+   },
+   {
+    "id": "p02",
+    "text": "初めまして、よろしくお願いします。",
+    "cer": 0,
+    "mean": 0.9248046825,
+    "gate": "accept",
+    "ms": 771
+   },
+   {
+    "id": "p03",
+    "text": "私は学生です。",
+    "cer": 0,
+    "mean": 0.9954427,
+    "gate": "accept",
+    "ms": 903
+   },
+   {
+    "id": "p04",
+    "text": "私はインドから来ました。",
+    "cer": 0,
+    "mean": 0.99176026,
+    "gate": "accept",
+    "ms": 363
+   },
+   {
+    "id": "p05",
+    "text": "私はラーメンが好きです。",
+    "cer": 0,
+    "mean": 0.9972330733333333,
+    "gate": "accept",
+    "ms": 502
+   },
+   {
+    "id": "p06",
+    "text": "コーヒーの方が好きです。",
+    "cer": 0,
+    "mean": 0.92150879,
+    "gate": "accept",
+    "ms": 497
+   },
+   {
+    "id": "p07",
+    "text": "昨日、友達と公園に行きました。",
+    "cer": 0,
+    "mean": 0.9874674433333334,
+    "gate": "accept",
+    "ms": 579
+   },
+   {
+    "id": "p08",
+    "text": "毎朝、学校に行きます。",
+    "cer": 0,
+    "mean": 0.969848625,
+    "gate": "accept",
+    "ms": 449
+   },
+   {
+    "id": "p09",
+    "text": "図書館で勉強します。",
+    "cer": 0,
+    "mean": 0.99755859,
+    "gate": "accept",
+    "ms": 452
+   },
+   {
+    "id": "p10",
+    "text": "週末は映画を見ました。",
+    "cer": 0,
+    "mean": 0.9782714833333334,
+    "gate": "accept",
+    "ms": 502
+   },
+   {
+    "id": "p11",
+    "text": "今日は天気がいいです。",
+    "cer": 0,
+    "mean": 0.9805908275,
+    "gate": "accept",
+    "ms": 372
+   },
+   {
+    "id": "p12",
+    "text": "日本語を勉強しています。",
+    "cer": 0,
+    "mean": 0.9990234499999999,
+    "gate": "accept",
+    "ms": 536
+   },
+   {
+    "id": "p13",
+    "text": "東京に行きたいです。",
+    "cer": 0,
+    "mean": 0.997680675,
+    "gate": "accept",
+    "ms": 3102
+   },
+   {
+    "id": "p14",
+    "text": "私の趣味は料理です。",
+    "cer": 0,
+    "mean": 0.997233075,
+    "gate": "accept",
+    "ms": 772
+   },
+   {
+    "id": "p15",
+    "text": "すみません、もう一度お願いします。",
+    "cer": 0,
+    "mean": 0.9929809625,
+    "gate": "accept",
+    "ms": 474
+   },
+   {
+    "id": "p16",
+    "text": "これはいくらですか？",
+    "cer": 0,
+    "mean": 0.9441731766666667,
+    "gate": "accept",
+    "ms": 452
+   },
+   {
+    "id": "p17",
+    "text": "駅はどこですか？",
+    "cer": 0,
+    "mean": 0.99279785,
+    "gate": "accept",
+    "ms": 423
+   },
+   {
+    "id": "p18",
+    "text": "水をください。",
+    "cer": 0,
+    "mean": 0.64111328,
+    "gate": "CONFIRM_HEARD",
+    "ms": 515
+   },
+   {
+    "id": "p19",
+    "text": "昨日、ラーメンを食べました。",
+    "cer": 0,
+    "mean": 0.9872640016666666,
+    "gate": "accept",
+    "ms": 726
+   },
+   {
+    "id": "p20",
+    "text": "来月、日本へ行きます。",
+    "cer": 0.16666666666666666,
+    "mean": 0.993994142,
+    "gate": "accept",
+    "ms": 462
+   }
+  ],
+  "Azure STT ja-JP": [
+   {
+    "id": "p01",
+    "text": "こんにちは。",
+    "cer": 0,
+    "mean": 0.87190133,
+    "gate": "accept",
+    "ms": 1380
+   },
+   {
+    "id": "p02",
+    "text": "初めまして。 よろしくお願いします。",
+    "cer": 0,
+    "mean": 0.9153432,
+    "gate": "accept",
+    "ms": 1147
+   },
+   {
+    "id": "p03",
+    "text": "私は学生です。",
+    "cer": 0,
+    "mean": 0.9576607,
+    "gate": "accept",
+    "ms": 528
+   },
+   {
+    "id": "p04",
+    "text": "私はインドから来ました。",
+    "cer": 0,
+    "mean": 0.95234656,
+    "gate": "accept",
+    "ms": 599
+   },
+   {
+    "id": "p05",
+    "text": "私はラーメンが好きです。",
+    "cer": 0,
+    "mean": 0.94835985,
+    "gate": "accept",
+    "ms": 608
+   },
+   {
+    "id": "p06",
+    "text": "コーヒーの方が好きです。",
+    "cer": 0,
+    "mean": 0.8808934,
+    "gate": "accept",
+    "ms": 641
+   },
+   {
+    "id": "p07",
+    "text": "昨日、友達と公園に行きました。",
+    "cer": 0,
+    "mean": 0.94457203,
+    "gate": "accept",
+    "ms": 710
+   },
+   {
+    "id": "p08",
+    "text": "毎朝、学校に行きます。",
+    "cer": 0,
+    "mean": 0.9509412,
+    "gate": "accept",
+    "ms": 726
+   },
+   {
+    "id": "p09",
+    "text": "図書館で勉強します。",
+    "cer": 0,
+    "mean": 0.9753623,
+    "gate": "accept",
+    "ms": 569
+   },
+   {
+    "id": "p10",
+    "text": "週末は映画を見ました。",
+    "cer": 0,
+    "mean": 0.94471234,
+    "gate": "accept",
+    "ms": 691
+   },
+   {
+    "id": "p11",
+    "text": "今日は天気がいいです。",
+    "cer": 0,
+    "mean": 0.9420566,
+    "gate": "accept",
+    "ms": 705
+   },
+   {
+    "id": "p12",
+    "text": "日本語を勉強しています。",
+    "cer": 0,
+    "mean": 0.9399396,
+    "gate": "accept",
+    "ms": 775
+   },
+   {
+    "id": "p13",
+    "text": "東京に行きたいです。",
+    "cer": 0,
+    "mean": 0.96332055,
+    "gate": "accept",
+    "ms": 904
+   },
+   {
+    "id": "p14",
+    "text": "私の趣味は料理です。",
+    "cer": 0,
+    "mean": 0.97342336,
+    "gate": "accept",
+    "ms": 580
+   },
+   {
+    "id": "p15",
+    "text": "すみません。もう一度お願いします。",
+    "cer": 0,
+    "mean": 0.94229376,
+    "gate": "accept",
+    "ms": 762
+   },
+   {
+    "id": "p16",
+    "text": "これはいくらですか？",
+    "cer": 0,
+    "mean": 0.9726358,
+    "gate": "accept",
+    "ms": 490
+   },
+   {
+    "id": "p17",
+    "text": "駅はどこですか？",
+    "cer": 0,
+    "mean": 0.9704878,
+    "gate": "accept",
+    "ms": 664
+   },
+   {
+    "id": "p18",
+    "text": "水を下さい。",
+    "cer": 0,
+    "mean": 0.8449544,
+    "gate": "accept",
+    "ms": 494
+   },
+   {
+    "id": "p19",
+    "text": "昨日、ラーメンを食べました。",
+    "cer": 0,
+    "mean": 0.9704092,
+    "gate": "accept",
+    "ms": 658
+   },
+   {
+    "id": "p20",
+    "text": "来月、日本へ行きます。",
+    "cer": 0.16666666666666666,
+    "mean": 0.92357624,
+    "gate": "accept",
+    "ms": 659
+   }
+  ],
+  "OpenAI gpt-transcribe": [
+   {
+    "id": "p01",
+    "text": "こんにちは。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1893
+   },
+   {
+    "id": "p02",
+    "text": "はじめまして。よろしくお願いします。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1893
+   },
+   {
+    "id": "p03",
+    "text": "私は学生です。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1253
+   },
+   {
+    "id": "p04",
+    "text": "私はインドから来ました。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 863
+   },
+   {
+    "id": "p05",
+    "text": "私はラーメンが好きです。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1348
+   },
+   {
+    "id": "p06",
+    "text": "コーヒーの方が好きです。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1127
+   },
+   {
+    "id": "p07",
+    "text": "昨日、友達と公園に行きました。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1621
+   },
+   {
+    "id": "p08",
+    "text": "毎朝、学校に行きます。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1294
+   },
+   {
+    "id": "p09",
+    "text": "図書館で勉強します。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1136
+   },
+   {
+    "id": "p10",
+    "text": "週末は映画を見ました。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1090
+   },
+   {
+    "id": "p11",
+    "text": "今日は天気がいいです。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1109
+   },
+   {
+    "id": "p12",
+    "text": "日本語を勉強しています。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 794
+   },
+   {
+    "id": "p13",
+    "text": "東京に行きたいです。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 924
+   },
+   {
+    "id": "p14",
+    "text": "私の趣味は料理です。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1476
+   },
+   {
+    "id": "p15",
+    "text": "すみません、もう一度お願いします。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 909
+   },
+   {
+    "id": "p16",
+    "text": "これはいくらですか。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 679
+   },
+   {
+    "id": "p17",
+    "text": "駅はどこですか?",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1323
+   },
+   {
+    "id": "p18",
+    "text": "水をください。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 676
+   },
+   {
+    "id": "p19",
+    "text": "昨日、ラーメンを食べました。",
+    "cer": 0,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 1300
+   },
+   {
+    "id": "p20",
+    "text": "来月、日本へ行きます。",
+    "cer": 0.16666666666666666,
+    "mean": null,
+    "gate": "no-confidence",
+    "ms": 793
+   }
+  ]
+ }
+}

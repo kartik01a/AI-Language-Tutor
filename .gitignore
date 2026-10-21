@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 !.env.example
 Screenshot*.png
+
+# Recorded voice clips (personal data, never commit)
+eval/audio/

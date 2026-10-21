@@ -25,6 +25,17 @@ production. Real-provider scripts: `scripts/probe-azure.mjs`, `probe-deepgram.mj
 `real-session.mjs`, `eval-corrections.mjs` — run with
 `node --env-file=.env.local node_modules/.bin/tsx scripts/<name>.mjs`. Measurements: `docs/research/notes/phase0-measurements.md`.
 
+## Compare speech recognisers on YOUR voice
+
+```bash
+npm run dev:real                       # then open http://localhost:3000/dev/record
+# record the 20 phrases (saved only on this computer, git-ignored), then:
+node --env-file=.env.local node_modules/.bin/tsx scripts/eval-stt.mjs <your-name>
+```
+
+Compares Deepgram (ja and multi), Azure ja-JP and OpenAI gpt-transcribe on accuracy, confidence and how often our gates
+would accept / ask "Did you say …?" / reject. `scripts/make-synthetic-clips.mjs` creates a dry-run speaker.
+
 ## Try the demo conversation (no API keys)
 
 ```bash

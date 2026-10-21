@@ -30,6 +30,8 @@ export function buildSsml(text: string, voice: Pick<VoiceConfig, "voiceName" | "
 export interface AzureTtsOptions {
   key: string;
   region: string;
+  /** "wav16k" returns 16 kHz mono PCM WAV (used to build test clips); default is MP3 for playback. */
+  format?: "mp3" | "wav16k";
   /** Per-call reading overrides (e.g. from the Japanese reading pipeline). */
   overridesFor?: (text: string) => ReadingOverride[];
 }
@@ -39,7 +41,8 @@ export class AzureTts implements TtsProvider {
 
   async synthesize(text: string, voice: VoiceConfig): Promise<TtsResult> {
     const config = sdk.SpeechConfig.fromSubscription(this.o.key, this.o.region);
-    config.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
+    const wav = this.o.format === "wav16k";
+    config.speechSynthesisOutputFormat = wav ? sdk.SpeechSynthesisOutputFormat.Riff16Khz16BitMonoPcm : sdk.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
     // `null` audio config: don't play through a speaker, just return the bytes.
     const synth = new sdk.SpeechSynthesizer(config, undefined as unknown as sdk.AudioConfig);
     const visemes: AzureVisemeEvent[] = [];
@@ -54,7 +57,7 @@ export class AzureTts implements TtsProvider {
       const durationMs = result.audioDuration / 10_000;
       return {
         audio: new Uint8Array(result.audioData),
-        format: "mp3",
+        format: wav ? "wav" : "mp3",
         visemes: mapAzureVisemes(visemes, { locale: voice.locale, totalMs: durationMs }),
         durationMs,
         // Azure bills each kanji as two characters; markup counts too (docs/12).

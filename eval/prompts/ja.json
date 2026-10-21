@@ -1,0 +1,25 @@
+{
+  "note": "Phrases for recording learner audio (S1, docs/13). `reading` is the kana reference used for CER. Keep them simple (A1-A2). Say them the way you would in a real conversation.",
+  "prompts": [
+    { "id": "p01", "text": "こんにちは。", "reading": "こんにちは", "romaji": "konnichiwa", "en": "Hello." },
+    { "id": "p02", "text": "はじめまして。よろしくお願いします。", "reading": "はじめましてよろしくおねがいします", "romaji": "hajimemashite. yoroshiku onegaishimasu", "en": "Nice to meet you." },
+    { "id": "p03", "text": "私は学生です。", "reading": "わたしはがくせいです", "romaji": "watashi wa gakusei desu", "en": "I am a student." },
+    { "id": "p04", "text": "私はインドから来ました。", "reading": "わたしはいんどからきました", "romaji": "watashi wa indo kara kimashita", "en": "I came from India." },
+    { "id": "p05", "text": "私はラーメンが好きです。", "reading": "わたしはらーめんがすきです", "romaji": "watashi wa raamen ga suki desu", "en": "I like ramen." },
+    { "id": "p06", "text": "コーヒーのほうが好きです。", "reading": "こーひーのほうがすきです", "romaji": "koohii no hou ga suki desu", "en": "I prefer coffee." },
+    { "id": "p07", "text": "昨日、友達と公園に行きました。", "reading": "きのうともだちとこうえんにいきました", "romaji": "kinou, tomodachi to kouen ni ikimashita", "en": "Yesterday I went to the park with a friend." },
+    { "id": "p08", "text": "毎朝、学校に行きます。", "reading": "まいあさがっこうにいきます", "romaji": "maiasa, gakkou ni ikimasu", "en": "I go to school every morning." },
+    { "id": "p09", "text": "図書館で勉強します。", "reading": "としょかんでべんきょうします", "romaji": "toshokan de benkyou shimasu", "en": "I study at the library." },
+    { "id": "p10", "text": "週末は映画を見ました。", "reading": "しゅうまつはえいがをみました", "romaji": "shuumatsu wa eiga o mimashita", "en": "I watched a movie at the weekend." },
+    { "id": "p11", "text": "今日は天気がいいです。", "reading": "きょうはてんきがいいです", "romaji": "kyou wa tenki ga ii desu", "en": "The weather is nice today." },
+    { "id": "p12", "text": "日本語を勉強しています。", "reading": "にほんごをべんきょうしています", "romaji": "nihongo o benkyou shite imasu", "en": "I am studying Japanese." },
+    { "id": "p13", "text": "東京に行きたいです。", "reading": "とうきょうにいきたいです", "romaji": "toukyou ni ikitai desu", "en": "I want to go to Tokyo." },
+    { "id": "p14", "text": "私の趣味は料理です。", "reading": "わたしのしゅみはりょうりです", "romaji": "watashi no shumi wa ryouri desu", "en": "My hobby is cooking." },
+    { "id": "p15", "text": "すみません、もう一度お願いします。", "reading": "すみませんもういちどおねがいします", "romaji": "sumimasen, mou ichido onegaishimasu", "en": "Sorry, one more time please." },
+    { "id": "p16", "text": "これはいくらですか。", "reading": "これはいくらですか", "romaji": "kore wa ikura desu ka", "en": "How much is this?" },
+    { "id": "p17", "text": "駅はどこですか。", "reading": "えきはどこですか", "romaji": "eki wa doko desu ka", "en": "Where is the station?" },
+    { "id": "p18", "text": "水をください。", "reading": "みずをください", "romaji": "mizu o kudasai", "en": "Water, please." },
+    { "id": "p19", "text": "昨日、ラーメンを食べました。", "reading": "きのうらーめんをたべました", "romaji": "kinou, raamen o tabemashita", "en": "I ate ramen yesterday." },
+    { "id": "p20", "text": "来月、日本へ行きます。", "reading": "らいげつにほんへいきます", "romaji": "raigetsu, nihon e ikimasu", "en": "I'm going to Japan next month." }
+  ]
+}
