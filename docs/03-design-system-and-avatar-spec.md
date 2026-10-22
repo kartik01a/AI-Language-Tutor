@@ -220,7 +220,8 @@ Everything above, plus:
 | Colours | Plain `fill="#RRGGBB"` presentation attributes; flat colours; ≤ 2 linear gradients total (prefer none) |
 | Strokes | Convert to fills, or centre-aligned strokes only, constant width |
 | Precision | 1 decimal place (2 for small facial features) |
-| **Forbidden** | `<text>`, `<image>` (no embedded rasters), `<filter>` (no blur/drop-shadow), `<mask>`, `<pattern>`, `<foreignObject>`, `<script>`, external `<use>`, `mix-blend-mode`, `display="none"`, `opacity="0"`, more than 2 `<clipPath>` (eyes only) |
+| **Hybrid art (added 2026-10-23)** | One `<image href="/avatars/<name>-art.webp">` is allowed for a blank-face illustration inside `head_base` (no data: URIs); eyes, brows, cheeks and mouths stay vector so they animate. Source PNG in `assets/avatars/src/`, converted by `node scripts/avatar-art.mjs` (~75 KB). |
+| **Forbidden** | `<text>`, a second `<image>` or any embedded raster, `<filter>` (no blur/drop-shadow), `<mask>`, `<pattern>`, `<foreignObject>`, `<script>`, external `<use>`, `mix-blend-mode`, `display="none"`, `opacity="0"`, more than 2 `<clipPath>` (eyes only) |
 
 Hidden variants (inactive mouths/expressions) must be **visible in the source file**, stacked on top of each other — the runtime hides them with a class. (Hidden elements would be deleted by the optimiser.)
 

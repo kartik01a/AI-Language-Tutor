@@ -36,7 +36,7 @@ export interface ContractIssue {
   message: string;
 }
 
-const FORBIDDEN_TAGS = ["text", "image", "filter", "mask", "pattern", "foreignObject", "script", "style"];
+const FORBIDDEN_TAGS = ["text", "filter", "mask", "pattern", "foreignObject", "script", "style"];
 
 export function validateAvatarSvg(svg: string, tier: Tier = "mvp"): ContractIssue[] {
   const issues: ContractIssue[] = [];
@@ -76,6 +76,12 @@ export function validateAvatarSvg(svg: string, tier: Tier = "mvp"): ContractIssu
 
   for (const tag of FORBIDDEN_TAGS) {
     if (new RegExp(`<${tag}\\b`, "i").test(svg)) err("forbidden.tag", `<${tag}> is not allowed`);
+  }
+  // Hybrid avatars may use one raster illustration, served from /avatars/ (never embedded data: URIs).
+  const images = svg.match(/<image\b[^>]*>/g) ?? [];
+  if (images.length > 1) err("image.count", "At most 1 <image> (the base illustration)");
+  for (const tag of images) {
+    if (!/\shref="\/avatars\/[a-z0-9_-]+\.(webp|png)"/.test(tag)) err("image.href", '<image> must use href="/avatars/<name>.webp"');
   }
   if (/display="none"|display:\s*none|\sopacity="0"/.test(svg)) {
     err("hidden", 'Hidden variants must be visible in source (no display="none" / opacity="0")');

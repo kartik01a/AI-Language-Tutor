@@ -7,7 +7,7 @@ const svg = readFileSync("assets/avatars/src/ja-yuki.svg", "utf8");
 const rules = (s: string) => validateAvatarSvg(s).filter((i) => i.level === "error").map((i) => i.rule);
 
 describe("avatar contract", () => {
-  it("the placeholder character satisfies the MVP contract", () => {
+  it("the Yuki avatar satisfies the MVP contract", () => {
     expect(validateAvatarSvg(svg).filter((i) => i.level === "error")).toEqual([]);
   });
 
@@ -17,9 +17,12 @@ describe("avatar contract", () => {
     ['<svg xmlns="http://www.w3.org/2000/svg"', '<svg width="512" xmlns="http://www.w3.org/2000/svg"', "root.size"],
     ['id="mouth_mbp"', 'id="mouth_rest"', "id.unique"],
     ['id="expr_confused"', 'id="Expr-Confused"', "id.format"],
-    ['id="head" data-pivot="256 410"', 'id="head"', "pivot"],
+    ['id="head" data-pivot="256 440"', 'id="head"', "pivot"],
     ["</g>\n  </g>\n</svg>", '<text>x</text></g>\n  </g>\n</svg>', "forbidden.tag"],
     ['<g id="mouth_rest" visibility="hidden">', '<g id="mouth_rest" display="none">', "hidden"],
+    ['href="/avatars/ja-yuki-art.webp"', 'href="https://example.com/x.png"', "image.href"],
+    ['href="/avatars/ja-yuki-art.webp"', 'href="data:image/png;base64,AAAA"', "image.href"],
+    ['<g id="body" data-pivot="256 500"></g>', '<g id="body" data-pivot="256 500"><image href="/avatars/ja-yuki-art.webp" width="1" height="1"/></g>', "image.count"],
   ])("rejects a broken asset (%#)", (from, to, rule) => {
     expect(svg).toContain(from);
     expect(rules(svg.replace(from, to))).toContain(rule);
