@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="avatar" data-contract="1">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="avatar" data-contract="1" data-blink="off">
   <!-- Hybrid avatar: art/ja-yuki.png (illustration, built to /avatars/ja-yuki-art.webp by scripts/avatar-art.mjs)
        plus vector eyes, brows, cheeks and mouths so they can animate. Image is drawn 560x560 at (-24,-6) so tilting never shows an edge. -->
   <g id="rig" data-pivot="256 500">

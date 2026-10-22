@@ -153,3 +153,11 @@ describe("AvatarController", () => {
     expect(c.frame(1).mouth).toBe("rest");
   });
 });
+
+describe("blink opt-out", () => {
+  it("never blinks when disabled", () => {
+    const c = new AvatarController(() => 0.5);
+    c.setBlinkEnabled(false);
+    for (let t = 0; t < 60_000; t += 16) expect(c.frame(t).blink).toBe(0);
+  });
+});

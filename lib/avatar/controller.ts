@@ -65,6 +65,7 @@ export class AvatarController {
   /** Returns elapsed audible ms since the start of the current message. */
   private clock: (() => number) | null = null;
   private reducedMotion = false;
+  private blinkEnabled = true;
   private blinkAt: number | null = null;
   private blinkScale = 1;
   private pendingDouble: number | null = null;
@@ -88,6 +89,10 @@ export class AvatarController {
   }
   setViseme(v: VisemeId | null) {
     this.forcedMouth = v;
+  }
+  /** Art whose eyes can't blink convincingly opts out via data-blink="off" on the SVG root. */
+  setBlinkEnabled(on: boolean) {
+    this.blinkEnabled = on;
   }
   setReducedMotion(on: boolean) {
     this.reducedMotion = on;
@@ -130,7 +135,7 @@ export class AvatarController {
     }
 
     // Blink scheduling (blinking is meaningful, so it stays under reduced motion).
-    if (this.blinkAt === null && nowMs >= this.nextBlinkAt) {
+    if (this.blinkEnabled && this.blinkAt === null && nowMs >= this.nextBlinkAt) {
       this.blinkAt = nowMs;
       const speaking = this.state === "speaking";
       if (this.rng() < 0.15) this.pendingDouble = nowMs + BLINK_DURATION_MS + 150 + this.rng() * 100;

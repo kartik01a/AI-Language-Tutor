@@ -30,6 +30,7 @@ export const AvatarStage = forwardRef<AvatarStageHandle, { svg: string; classNam
     const c = controller.current as AvatarController;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     c.setReducedMotion(mq.matches);
+    c.setBlinkEnabled(!/<svg\b[^>]*data-blink="off"/.test(svg));
     const onMq = () => c.setReducedMotion(mq.matches);
     mq.addEventListener("change", onMq);
 
@@ -52,7 +53,7 @@ export const AvatarStage = forwardRef<AvatarStageHandle, { svg: string; classNam
       cancelAnimationFrame(raf);
       mq.removeEventListener("change", onMq);
     };
-  }, []);
+  }, [svg]);
 
   // The SVG comes from our own build pipeline (validated against the asset contract), not user input.
   return <div ref={host} className={className} role="img" aria-label="Tutor avatar" dangerouslySetInnerHTML={{ __html: svg }} />;
