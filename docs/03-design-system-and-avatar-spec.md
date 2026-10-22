@@ -47,7 +47,7 @@ Defined as CSS custom properties on `:root` (light). Dark-mode values are reserv
 | `--paper-50` | `#FAF8F5` | app background (warm off-white) |
 | `--paper-100` | `#F2EFEA` | sunken surfaces |
 
-Tutor accents: `--tutor-yuki: #F47FA4` (sakura), `--tutor-lena: #14A3A3` (teal), `--tutor-sam: #FF8A3D` (tangerine). Used for ring pulse, avatar stage gradient, tutor name label — never for body text on white.
+**Amendment 2026-10-23 (owner: "not pink"):** UI chrome is iris + warm paper only; tutor accents are not used for borders or backgrounds in the MVP, so Yuki's UI is not pink (her art still is). Tutor accents (originally `--tutor-yuki: #F47FA4` (sakura), `--tutor-lena: #14A3A3` (teal), `--tutor-sam: #FF8A3D` (tangerine)) are reserved for small details later. Used for ring pulse, avatar stage gradient, tutor name label — never for body text on white.
 
 ### Semantic tokens
 

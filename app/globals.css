@@ -1,22 +1,61 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Design tokens from docs/03 Part A. Light mode first (docs/01 D-35); dark tokens come later under [data-theme="dark"].
+   Theme direction: calm indigo + warm paper, so the tutor's art is the only colourful thing on screen. */
+@theme {
+  --color-iris-50: #f0f0ff;
+  --color-iris-100: #e4e6fb;
+  --color-iris-200: #cdd0f6;
+  --color-iris-300: #a5a5f0;
+  --color-iris-500: #5b5bd6;
+  --color-iris-600: #4d4dc4;
+  --color-iris-700: #3e3ea8;
+  --color-ink-900: #1c1b2e;
+  --color-ink-600: #555470;
+  --color-ink-400: #8a89a3;
+  --color-ink-300: #b9b8cc;
+  --color-paper-0: #ffffff;
+  --color-paper-50: #faf8f5;
+  --color-paper-100: #f2efea;
+  --color-amber-card: #fff3d6;
+  --color-amber-ink: #8a5300;
+  --color-sky-card: #e3f0ff;
+  --color-sky-ink: #1d5bb0;
+  --color-leaf-ink: #1e7f56;
+  --color-rose-rec: #e5484d;
+  --font-sans: var(--font-nunito), system-ui, sans-serif;
+  --font-display: var(--font-baloo), var(--font-nunito), sans-serif;
+  --font-jp: var(--font-jp-rounded), "Hiragino Maru Gothic ProN", "Noto Sans JP", sans-serif;
+  --shadow-bubble: 0 1px 2px rgba(28, 27, 46, 0.06), 0 2px 8px rgba(28, 27, 46, 0.06);
+  --animate-ring: ring 1.6s ease-out infinite;
+  @keyframes ring {
+    0% { box-shadow: 0 0 0 0 rgba(91, 91, 214, 0.35); }
+    100% { box-shadow: 0 0 0 16px rgba(91, 91, 214, 0); }
+  }
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* Light mode first (docs/01 D-35). Dark-mode tokens are added later under [data-theme="dark"]. */
 
 body {
   color-scheme: light;
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #e9ebf7;
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Japanese learning content: larger, rounded, fixed-width kana (docs/03 A3). */
+:lang(ja) {
+  font-family: var(--font-jp);
+  font-feature-settings: normal;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-iris-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }
