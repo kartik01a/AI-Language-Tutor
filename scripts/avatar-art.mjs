@@ -7,7 +7,7 @@ import sharp from "sharp";
 const dir = new URL("../assets/avatars/src/", import.meta.url);
 const out = new URL("../public/avatars/", import.meta.url);
 mkdirSync(out, { recursive: true });
-for (const f of readdirSync(dir).filter((f) => f.endsWith(".png"))) {
+for (const f of readdirSync(dir).filter((f) => f.endsWith(".png") && !f.startsWith("_"))) {
   const dest = new URL(f.replace(/\.png$/, "-art.webp"), out);
   await sharp(fileURLToPath(new URL(f, dir)))
     .resize(800, 800, { fit: "inside" })

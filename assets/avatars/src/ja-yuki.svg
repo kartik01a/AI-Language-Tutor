@@ -1,47 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" id="avatar" data-contract="1">
-  <!-- Hybrid avatar: art/ja-yuki.png (blank-face illustration, built to /avatars/ja-yuki-art.webp by scripts/avatar-art.mjs)
+  <!-- Hybrid avatar: art/ja-yuki.png (illustration, built to /avatars/ja-yuki-art.webp by scripts/avatar-art.mjs)
        plus vector eyes, brows, cheeks and mouths so they can animate. Image is drawn 560x560 at (-24,-6) so tilting never shows an edge. -->
   <g id="rig" data-pivot="256 500">
     <ellipse id="shadow" cx="256" cy="506" rx="110" ry="8" fill="#1C1B2E" fill-opacity="0.12"/>
     <g id="body" data-pivot="256 500"></g>
     <g id="head" data-pivot="256 440">
       <g id="head_base"><image href="/avatars/ja-yuki-art.webp" x="-24" y="-6" width="560" height="560"/></g>
-      <g id="cheeks"><ellipse cx="186" cy="248" rx="12" ry="7" fill="#F4929A" fill-opacity="0.38"/><ellipse cx="326" cy="248" rx="12" ry="7" fill="#F4929A" fill-opacity="0.38"/></g>
-      <defs><linearGradient id="iris" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A2022"/><stop offset="1" stop-color="#8A5650"/></linearGradient></defs>
+      <g id="cheeks"><ellipse cx="199" cy="244" rx="14" ry="7" fill="#F4929A" fill-opacity="0.15"/><ellipse cx="313" cy="241" rx="14" ry="7" fill="#F4929A" fill-opacity="0.15"/></g>
+      <!-- The illustration's own eyes, brows and mouth are the resting look. Eyes blink by a skin-coloured lid sliding over them
+           (pupil/white are tiny stand-ins the controller can nudge); the mouth patch hides the painted mouth so viseme shapes can replace it. -->
       <g id="eyes">
         <g id="eye_l">
-          <ellipse id="eye_l_white" cx="199" cy="221" rx="14.5" ry="15.5" fill="#FFFFFF"/>
-          <g id="eye_l_pupil" data-pivot="199 221"><ellipse cx="199" cy="222" rx="12" ry="14.5" fill="url(#iris)"/><ellipse cx="199" cy="222" rx="6" ry="8" fill="#170C0E"/><circle cx="194.5" cy="216" r="4" fill="#FFFFFF"/><circle cx="204" cy="229" r="2" fill="#FFFFFF" fill-opacity="0.85"/></g>
-          <ellipse id="eye_l_lid" data-pivot="199 201.5" cx="199" cy="221" rx="18.5" ry="19.5" fill="#FCDCC5"/>
-          <path d="M182 220 Q184 202 200 201.5 Q213 202 216 218 Q209 206.5 198 206 Q188 207 182 220Z" fill="#2B1A1A"/>
-          <path d="M183 218 L178 214.5" stroke="#2B1A1A" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-          <path id="eye_l_closed" d="M183 222 Q199 230 215 222" stroke="#2B1A1A" stroke-width="3" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <circle id="eye_l_white" cx="208" cy="213" r="1.4" fill="#3B2420"/>
+          <circle id="eye_l_pupil" data-pivot="208 213" cx="208" cy="213" r="1.4" fill="#3B2420"/>
+          <ellipse id="eye_l_lid" data-pivot="201 179" cx="201" cy="206" rx="34" ry="27" fill="#FCE1CD"/>
+          <path id="eye_l_closed" d="M172 203 Q201 219 230 203" stroke="#2A1A16" stroke-width="3.6" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <path d="M172 203 L167 199" stroke="#2A1A16" stroke-width="3" fill="none" stroke-linecap="round"/>
         </g>
         <g id="eye_r">
-          <ellipse id="eye_r_white" cx="311" cy="221" rx="14.5" ry="15.5" fill="#FFFFFF"/>
-          <g id="eye_r_pupil" data-pivot="311 221"><ellipse cx="311" cy="222" rx="12" ry="14.5" fill="url(#iris)"/><ellipse cx="311" cy="222" rx="6" ry="8" fill="#170C0E"/><circle cx="306.5" cy="216" r="4" fill="#FFFFFF"/><circle cx="316" cy="229" r="2" fill="#FFFFFF" fill-opacity="0.85"/></g>
-          <ellipse id="eye_r_lid" data-pivot="311 201.5" cx="311" cy="221" rx="18.5" ry="19.5" fill="#FCDCC5"/>
-          <path d="M294 220 Q296 202 312 201.5 Q325 202 328 218 Q321 206.5 310 206 Q300 207 294 220Z" fill="#2B1A1A"/>
-          <path d="M327 218 L332 214.5" stroke="#2B1A1A" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-          <path id="eye_r_closed" d="M295 222 Q311 230 327 222" stroke="#2B1A1A" stroke-width="3" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <circle id="eye_r_white" cx="305" cy="213" r="1.4" fill="#3B2420"/>
+          <circle id="eye_r_pupil" data-pivot="305 213" cx="305" cy="213" r="1.4" fill="#3B2420"/>
+          <ellipse id="eye_r_lid" data-pivot="315 179" cx="315" cy="206" rx="34" ry="27" fill="#FCE1CD"/>
+          <path id="eye_r_closed" d="M286 203 Q315 219 344 203" stroke="#2A1A16" stroke-width="3.6" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <path d="M344 203 L349 199" stroke="#2A1A16" stroke-width="3" fill="none" stroke-linecap="round"/>
         </g>
       </g>
       <g id="brows">
-        <path id="brow_l" data-pivot="199 193" d="M182 197 Q198 187 216 193" stroke="#4A3434" stroke-width="2.8" fill="none" stroke-linecap="round"/>
-        <path id="brow_r" data-pivot="311 193" d="M294 193 Q312 187 328 197" stroke="#4A3434" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+        <path id="brow_l" data-pivot="201 165" d="M180 167 Q200 160 222 165" stroke="#4A3434" stroke-width="2" stroke-opacity="0.01" fill="none"/>
+        <path id="brow_r" data-pivot="315 165" d="M294 165 Q316 160 336 167" stroke="#4A3434" stroke-width="2" stroke-opacity="0.01" fill="none"/>
       </g>
-      <g id="mouth" data-pivot="256 281">
-<g transform="translate(0 -5)">
-        <g id="mouth_rest" visibility="hidden"><path d="M240 282 Q256 296 272 282" stroke="#B5565E" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M239 281 L237 278.5 M273 281 L275 278.5" stroke="#B5565E" stroke-width="2.2" stroke-linecap="round"/></g>
-        <g id="mouth_mbp" visibility="hidden"><path d="M243 286 Q256 289 269 286" stroke="#A8474F" stroke-width="4.2" fill="none" stroke-linecap="round"/></g>
-        <g id="mouth_cons" visibility="hidden"><path d="M240 283 Q256 280 272 283 Q256 299 240 283Z" fill="#8E3340"/><path d="M245 284 L267 284 L265.5 288.5 L246.5 288.5Z" fill="#FFFFFF"/></g>
-        <g id="mouth_a" visibility="hidden"><ellipse cx="256" cy="288" rx="17" ry="14" fill="#8E3340"/><ellipse cx="256" cy="295" rx="10" ry="5.5" fill="#E0707E"/></g>
-        <g id="mouth_i" visibility="hidden"><path d="M236 284 Q256 280 276 284 Q256 297 236 284Z" fill="#8E3340"/><path d="M243 284 L269 284 L267 288 L245 288Z" fill="#FFFFFF"/></g>
-        <g id="mouth_u" visibility="hidden"><ellipse cx="256" cy="286" rx="8" ry="9" fill="#8E3340"/></g>
-        <g id="mouth_e" visibility="hidden"><ellipse cx="256" cy="286" rx="15" ry="8.5" fill="#8E3340"/><path d="M244 282.5 L268 282.5 L266 287 L246 287Z" fill="#FFFFFF"/></g>
-        <g id="mouth_o" visibility="hidden"><ellipse cx="256" cy="287" rx="11.5" ry="12.5" fill="#8E3340"/><ellipse cx="256" cy="292" rx="6" ry="4" fill="#E0707E"/></g>
-        <g id="mouth_fv" visibility="hidden"><path d="M241 282 Q256 279 271 282 Q256 295 241 282Z" fill="#8E3340"/><path d="M246 282.5 L266 282.5 L264.5 287 L247.5 287Z" fill="#FFFFFF"/><path d="M246 291 Q256 298 266 291" stroke="#E0707E" stroke-width="4" fill="none" stroke-linecap="round"/></g>
-        <g id="mouth_l_th" visibility="hidden"><ellipse cx="256" cy="286" rx="14" ry="9" fill="#8E3340"/><path d="M244 282 L268 282 L266.5 286 L245.5 286Z" fill="#FFFFFF"/><ellipse cx="256" cy="290" rx="6.5" ry="3.5" fill="#E0707E"/></g></g>
+      <g id="mouth" data-pivot="256 280">
+        <ellipse cx="256" cy="280" rx="39" ry="21" fill="#FCE1CD"/>
+        <g id="mouth_rest" visibility="hidden"><path d="M234 274 Q256 291 278 274" stroke="#A8574E" stroke-width="2.8" fill="none" stroke-linecap="round"/><path d="M233.5 273 L231.5 270.5 M278.5 273 L280.5 270.5" stroke="#A8574E" stroke-width="2" stroke-linecap="round"/></g>
+        <g id="mouth_mbp" visibility="hidden"><path d="M237 276 Q256 281 275 276" stroke="#A8574E" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+        <g id="mouth_cons" visibility="hidden"><path d="M236 273 Q256 278.5 276 273 Q272 285 256 286 Q240 285 236 273Z" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5" stroke-linejoin="round"/><path d="M239 273.8 Q256 279.3 273 273.8 L272 278.3 Q256 283.8 240 278.3Z" fill="#F9F0E9"/></g>
+        <g id="mouth_a" visibility="hidden"><path d="M234 272 Q256 277.5 278 272 Q274 293 256 294 Q238 293 234 272Z" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5" stroke-linejoin="round"/><path d="M237 272.8 Q256 278.3 275 272.8 L274 277.3 Q256 282.8 238 277.3Z" fill="#F9F0E9"/><ellipse cx="256" cy="288" rx="7.0" ry="3.6" fill="#F58A86"/></g>
+        <g id="mouth_i" visibility="hidden"><path d="M231 273 Q256 278.5 281 273 Q277 284 256 285 Q235 284 231 273Z" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5" stroke-linejoin="round"/><path d="M234 273.8 Q256 279.3 278 273.8 L277 278.3 Q256 283.8 235 278.3Z" fill="#F9F0E9"/></g>
+        <g id="mouth_u" visibility="hidden"><ellipse cx="256" cy="280" rx="8" ry="9.5" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5"/></g>
+        <g id="mouth_e" visibility="hidden"><path d="M238 272 Q256 277.5 274 272 Q270 288 256 289 Q242 288 238 272Z" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5" stroke-linejoin="round"/><path d="M241 272.8 Q256 278.3 271 272.8 L270 277.3 Q256 282.8 242 277.3Z" fill="#F9F0E9"/></g>
+        <g id="mouth_o" visibility="hidden"><ellipse cx="256" cy="281" rx="11" ry="13" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5"/><ellipse cx="256" cy="287" rx="6" ry="4" fill="#F58A86"/></g>
+        <g id="mouth_fv" visibility="hidden"><path d="M236 273 Q256 278.5 276 273 Q272 284 256 285 Q240 284 236 273Z" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5" stroke-linejoin="round"/><path d="M239 273.8 Q256 279.3 273 273.8 L272 278.3 Q256 283.8 240 278.3Z" fill="#F9F0E9"/><path d="M242 284.5 Q256 291 270 284.5" stroke="#E8877E" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+        <g id="mouth_l_th" visibility="hidden"><path d="M237 272 Q256 277.5 275 272 Q271 286 256 287 Q241 286 237 272Z" fill="#FBA393" stroke="#8A4A42" stroke-width="1.5" stroke-linejoin="round"/><path d="M240 272.8 Q256 278.3 272 272.8 L271 277.3 Q256 282.8 241 277.3Z" fill="#F9F0E9"/><ellipse cx="256" cy="281" rx="6.1" ry="3.6" fill="#F58A86"/></g>
       </g>
       <g id="expr">
         <g id="expr_neutral" visibility="hidden"><circle cx="256" cy="231" r="1" fill="#FCDCC5"/></g>
