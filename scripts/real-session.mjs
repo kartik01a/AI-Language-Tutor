@@ -2,7 +2,7 @@
 // The "learner" is an Azure voice speaking scripted sentences — plumbing/behaviour test, NOT learner-audio evidence.
 // Usage: node --env-file=.env.local node_modules/.bin/tsx scripts/real-session.mjs
 import { AzureTts } from "../lib/providers/azure-tts.ts";
-import { buildProviders } from "../lib/server/runtime.ts";
+import { buildProviders, realKeeper } from "../lib/server/runtime.ts";
 import { loadConfig } from "../lib/config.ts";
 import { MemorySpendStore, monthKey } from "../lib/limits/budget.ts";
 import { MemorySessionStore } from "../lib/session/store.ts";
@@ -11,7 +11,8 @@ import { SessionService } from "../lib/session/service.ts";
 process.env.PROVIDERS = "real";
 const p = buildProviders();
 const spend = new MemorySpendStore();
-const svc = new SessionService({ store: new MemorySessionStore(), stt: p.stt, llm: p.llm, tts: p.tts, spend, config: loadConfig() });
+const keeper = realKeeper();
+const svc = new SessionService({ store: new MemorySessionStore(), stt: p.stt, llm: p.llm, tts: p.tts, spend, config: loadConfig(), onActivity: keeper.touch });
 const learnerVoice = new AzureTts({ key: process.env.AZURE_SPEECH_KEY, region: process.env.AZURE_SPEECH_REGION });
 const say = async (text) => (await learnerVoice.synthesize(text, { provider: "azure", voiceName: "ja-JP-KeitaNeural", locale: "ja-JP" }));
 
@@ -36,6 +37,7 @@ const script = [
   "昨日、ラーメンを食べます。",
 ];
 for (const line of script) {
+  await new Promise((r) => setTimeout(r, 6000)); // a learner takes a few seconds to answer: connections go idle
   const clip = await say(line);
   const before = await cost();
   const t0 = Date.now();

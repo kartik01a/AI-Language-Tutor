@@ -2,7 +2,7 @@ import type { LlmProvider, LlmUsage, SttProvider, SttResult } from "@/lib/provid
 import { createInitialState, step } from "./dialogue-machine";
 import { applyGates, hasNonTargetTokens, type ClipInfo, type GateOutcome, type GateThresholds } from "./gates";
 import { buildTurnPrompt, type PromptContext } from "./prompt";
-import { reconcileCategory, turnOutputSchema, type LlmCategory, type TurnOutput } from "./schemas";
+import { reconcileCategory, turnOutputSchema, turnCoreSchema, type LlmCategory, type TurnOutput } from "./schemas";
 import { strictJsonSchema } from "@/lib/providers/json-schema";
 import type { DialogueState, MachineConfig, PolicyAction, TurnCategory } from "./types";
 import { validateReply } from "./output-validation";
@@ -79,7 +79,7 @@ const LLM_REPLY_ACTIONS = new Set([
   "MODEL_ANSWER_AND_MOVE_ON", "SUGGEST_AND_MOVE_ON", "EXPLAIN_WORD",
 ]);
 
-export const TURN_SCHEMA = { name: "turn_output", jsonSchema: strictJsonSchema(turnOutputSchema) };
+export const TURN_SCHEMA = { name: "turn_output", jsonSchema: strictJsonSchema(turnCoreSchema) };
 
 async function callLlmWithRepair(llm: LlmProvider, req: { system: string; user: string }, usage: LlmUsage[]) {
   for (let attempt = 0; attempt < 2; attempt++) {

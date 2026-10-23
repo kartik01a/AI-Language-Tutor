@@ -42,7 +42,8 @@ export function buildStaticPrefix(tutor: TutorConfig, level: Level): string {
     "- Do not state or imply corrections inside `reply.sentences`. A single short echo of the correct form may go in `reply.recast` only for a clear error in a confidently recognised word.",
     "",
     "OUTPUT",
-    "Return JSON matching the provided schema exactly. Fill `analysis` first, then `reply`, then `hints` (for the question you just asked), then `words_introduced`.",
+    "Return JSON matching the provided schema exactly. Fill `analysis` first, then `reply`.",
+    "Be terse in `analysis`, because every word you write is time the learner waits: `meaning_summary` is at most 5 English words; `recovered_fragment` is null unless the category is partially_understood; keep `goal_progress` empty unless a goal was clearly achieved.",
   ].join("\n");
 }
 

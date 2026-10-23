@@ -7,6 +7,7 @@ import { SessionService, ServiceError, type OutFrame } from "@/lib/session/servi
 import { MemorySessionStore } from "@/lib/session/store";
 import type { ServerEvent } from "@/lib/contracts/events";
 import type { SttProvider } from "@/lib/providers/types";
+import { TURN_SCHEMA } from "@/lib/tutor/turn-pipeline";
 
 async function collect(gen: AsyncGenerator<OutFrame>) {
   const events: ServerEvent[] = [];
@@ -115,6 +116,50 @@ describe("session flow", () => {
     expect(levels).toEqual([1, 2, 3]);
     const fourth = await collect(svc.handleEvent(sessionId, { e: "hint_request" }));
     expect(fourth.events.some((e) => e.t === "sentence")).toBe(true);
+  });
+
+  describe("hints are requested beside the reply, not inside it", () => {
+    const build = (failEnrich = false) => {
+      const inner = new DemoLlm();
+      const calls: string[] = [];
+      const llm = {
+        async turn(req: Parameters<DemoLlm["turn"]>[0]) {
+          calls.push(req.schema?.name ?? "none");
+          if (failEnrich && req.schema?.name === "turn_enrichment") throw new Error("down");
+          return inner.turn(req);
+        },
+      };
+      const svc = new SessionService({
+        store: new MemorySessionStore(), stt: new DemoStt(), llm, tts: new DemoTts(), spend: new MemorySpendStore(),
+        config: loadConfig({}), now: () => 1_000_000, newId: (() => { let n = 0; return () => `id-${++n}`; })(),
+      });
+      return { svc, calls };
+    };
+
+    it("the live turn schema has no hints/words fields, and a separate call fills them", async () => {
+      const { svc, calls } = build();
+      const { sessionId } = await svc.createSession({ level: "A2" });
+      await collect(svc.handleEvent(sessionId, { e: "start" }));
+      await collect(svc.handleEvent(sessionId, { e: "topic_chip", label: "食べ物" }));
+      await collect(svc.handleTurn(sessionId, audio, "audio/webm", speech));
+      expect(calls).toContain("turn_output");
+      expect(calls).toContain("turn_enrichment");
+      const turn = TURN_SCHEMA.jsonSchema as { properties: Record<string, unknown> };
+      expect(Object.keys(turn.properties).sort()).toEqual(["analysis", "reply"]);
+      const hint = (await collect(svc.handleEvent(sessionId, { e: "hint_request" }))).events.find((e) => e.t === "hint");
+      expect(hint && hint.t === "hint" && hint.text).not.toBe("Say something short, like a topic you like.");
+    });
+
+    it("if the hints request fails the turn still completes and the generic hint is used", async () => {
+      const { svc } = build(true);
+      const { sessionId } = await svc.createSession({ level: "A2" });
+      await collect(svc.handleEvent(sessionId, { e: "start" }));
+      await collect(svc.handleEvent(sessionId, { e: "topic_chip", label: "食べ物" }));
+      const r = await collect(svc.handleTurn(sessionId, audio, "audio/webm", speech));
+      expect(r.types.at(-1)).toBe("turn_end");
+      const hint = (await collect(svc.handleEvent(sessionId, { e: "hint_request" }))).events.find((e) => e.t === "hint");
+      expect(hint && hint.t === "hint" && hint.text).toBe("Say something short, like a topic you like.");
+    });
   });
 
   it("silence nudge speaks a line and opens hint level 1", async () => {

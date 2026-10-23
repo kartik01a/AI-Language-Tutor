@@ -15,6 +15,14 @@ export const turnCategorySchema = z.enum([
   "unsafe",
 ]);
 
+const hintsSchema = z.object({
+  hint: z.string(),
+  starter: z.string(),
+  example: z.string(),
+  example_translation: z.string(),
+});
+const wordsSchema = z.array(z.object({ lemma: z.string(), reading: z.string().nullable(), meaning: z.string() }));
+
 export const turnOutputSchema = z.object({
   analysis: z.object({
     category: turnCategorySchema,
@@ -38,16 +46,18 @@ export const turnOutputSchema = z.object({
     translation: z.array(z.string()),
     teach_phrase: z.object({ text: z.string(), translation: z.string() }).nullable(),
   }),
-  hints: z.object({
-    hint: z.string(),
-    starter: z.string(),
-    example: z.string(),
-    example_translation: z.string(),
-  }),
-  words_introduced: z.array(
-    z.object({ lemma: z.string(), reading: z.string().nullable(), meaning: z.string() }),
-  ),
+  // Optional: the live turn call no longer asks for these (every output token costs ~10 ms of waiting).
+  // They come from `enrichSchema`, requested in parallel while the tutor speaks.
+  hints: hintsSchema.optional(),
+  words_introduced: wordsSchema.optional(),
 });
+
+/** What the live turn call is asked for: the decision and the reply, nothing else. */
+export const turnCoreSchema = turnOutputSchema.omit({ hints: true, words_introduced: true });
+
+/** Hints for the question just asked, plus new words: generated beside the reply, off the critical path. */
+export const enrichSchema = z.object({ hints: hintsSchema, words_introduced: wordsSchema });
+export type Enrichment = z.infer<typeof enrichSchema>;
 
 export type TurnOutput = z.infer<typeof turnOutputSchema>;
 export type LlmCategory = z.infer<typeof turnCategorySchema>;

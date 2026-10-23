@@ -3,6 +3,8 @@ import type { LlmProvider, LlmRequest, LlmUsage } from "./types";
 // OpenAI Responses API (docs/04 §4). store:false and a hashed safety identifier on every call;
 // reasoning effort "none" keeps tutor turns fast.
 
+export const DEFAULT_MODEL = "gpt-5.6-luna";
+
 export interface OpenAiOptions {
   apiKey: string;
   model?: string;
@@ -40,7 +42,7 @@ export function buildRequestBody(req: LlmRequest, model: string, safetyIdentifie
   };
 }
 
-export function parseResponse(j: ResponsesOutput): { json: unknown; usage: LlmUsage } {
+export function parseResponse(j: ResponsesOutput, model?: string): { json: unknown; usage: LlmUsage } {
   if (j.error?.message) throw new Error(`OpenAI error: ${j.error.message}`);
   const content = j.output?.flatMap((o) => (o.type === "message" ? (o.content ?? []) : [])) ?? [];
   const refusal = content.find((c) => c.type === "refusal");
@@ -50,6 +52,7 @@ export function parseResponse(j: ResponsesOutput): { json: unknown; usage: LlmUs
   return {
     json: JSON.parse(text),
     usage: {
+      model,
       inputTokens: j.usage?.input_tokens ?? 0,
       cachedInputTokens: j.usage?.input_tokens_details?.cached_tokens ?? 0,
       outputTokens: j.usage?.output_tokens ?? 0,
@@ -65,12 +68,12 @@ export class OpenAiLlm implements LlmProvider {
     const res = await f(`${this.o.baseUrl ?? "https://api.openai.com"}/v1/responses`, {
       method: "POST",
       headers: { Authorization: `Bearer ${this.o.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(buildRequestBody(req, this.o.model ?? "gpt-6-luna", this.o.safetyIdentifier)),
+      body: JSON.stringify(buildRequestBody(req, this.o.model ?? DEFAULT_MODEL, this.o.safetyIdentifier)),
       signal,
     });
     const j = (await res.json().catch(() => ({}))) as ResponsesOutput;
     if (!res.ok) throw new Error(`OpenAI ${res.status}: ${j.error?.message ?? "request failed"}`);
-    return parseResponse(j);
+    return parseResponse(j, this.o.model ?? DEFAULT_MODEL);
   }
 
   async turn(req: LlmRequest): Promise<{ json: unknown; usage: LlmUsage }> {

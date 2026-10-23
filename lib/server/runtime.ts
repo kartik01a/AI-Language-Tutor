@@ -3,9 +3,10 @@ import { MemorySpendStore } from "@/lib/limits/budget";
 import { DemoLlm, DemoStt, DemoTts } from "@/lib/providers/demo";
 import { AzureTts } from "@/lib/providers/azure-tts";
 import { DeepgramStt } from "@/lib/providers/deepgram";
-import { OpenAiLlm } from "@/lib/providers/openai";
+import { DEFAULT_MODEL, OpenAiLlm } from "@/lib/providers/openai";
 import type { LlmProvider, SttProvider, TtsProvider } from "@/lib/providers/types";
 import { warmUpSchemas } from "./warmup";
+import { createWarmKeeper, installKeepAlive } from "./http";
 import { SessionService, ServiceError, type OutFrame } from "@/lib/session/service";
 import { MemorySessionStore } from "@/lib/session/store";
 import { encodeAudioFrame, encodeJsonFrame } from "@/lib/contracts/frames";
@@ -27,13 +28,22 @@ function requireEnv(name: string): string {
 /** PROVIDERS=demo (default): scripted, no keys. PROVIDERS=real: Deepgram + OpenAI + Azure. */
 export function buildProviders(env: NodeJS.ProcessEnv = process.env): { stt: SttProvider; llm: LlmProvider; tts: TtsProvider; mode: "demo" | "real" } {
   if (env.PROVIDERS !== "real") return { stt: new DemoStt(), llm: new DemoLlm(), tts: new DemoTts(), mode: "demo" };
+  installKeepAlive();
   return {
     mode: "real",
     stt: new DeepgramStt({ apiKey: requireEnv("DEEPGRAM_API_KEY") }),
     // Hedging: a backup request after 4 s tames OpenAI's heavy latency tail (we saw 11–15 s outliers).
-    llm: new OpenAiLlm({ apiKey: requireEnv("OPENAI_API_KEY"), model: env.OPENAI_MODEL_TURN || "gpt-6-luna", hedgeAfterMs: 4000, timeoutMs: 15000 }),
+    llm: new OpenAiLlm({ apiKey: requireEnv("OPENAI_API_KEY"), model: env.OPENAI_MODEL_TURN || DEFAULT_MODEL, hedgeAfterMs: 4000, timeoutMs: 15000 }),
     tts: new AzureTts({ key: requireEnv("AZURE_SPEECH_KEY"), region: requireEnv("AZURE_SPEECH_REGION") }),
   };
+}
+
+/** Keeps the Deepgram and OpenAI connections warm while conversations are active (see ./http). */
+export function realKeeper() {
+  return createWarmKeeper([
+    { url: "https://api.deepgram.com/v1/projects", headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}` } },
+    { url: `https://api.openai.com/v1/models/${process.env.OPENAI_MODEL_TURN || DEFAULT_MODEL}`, headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } },
+  ]);
 }
 
 export function getService(): SessionService {
@@ -44,8 +54,14 @@ export function getService(): SessionService {
   }
   return (g.__lactice ??= (() => {
     const p = buildProviders();
-    if (p.mode === "real") void warmUpSchemas(p.llm); // fire and forget
-    return new SessionService({ store: new MemorySessionStore(), stt: p.stt, llm: p.llm, tts: p.tts, spend: new MemorySpendStore(), config: loadConfig() });
+    if (p.mode === "real") {
+      void warmUpSchemas(p.llm); // fire and forget
+    }
+    const keeper = p.mode === "real" ? realKeeper() : null;
+    return new SessionService({
+      store: new MemorySessionStore(), stt: p.stt, llm: p.llm, tts: p.tts, spend: new MemorySpendStore(), config: loadConfig(),
+      onActivity: keeper?.touch,
+    });
   })());
 }
 

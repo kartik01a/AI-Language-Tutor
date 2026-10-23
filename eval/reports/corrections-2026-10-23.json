@@ -1,0 +1,252 @@
+{
+ "file": "eval/datasets/ja/corrections.v0.json",
+ "repeats": 1,
+ "recall": 0.875,
+ "falseCorrectionRate": 0,
+ "rows": [
+  {
+   "id": "err-01",
+   "said": "昨日、友達と公園を行きました。",
+   "heard": "昨日友達と公園を行きました",
+   "expect": "ja.particle.destination",
+   "cards": [
+    {
+     "code": "ja.particle.destination",
+     "original": "公園を",
+     "corrected": "公園に"
+    }
+   ],
+   "hit": true,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "err-02",
+   "said": "図書館に勉強します。",
+   "heard": "図書館に勉強します。",
+   "expect": "ja.particle.location_action",
+   "cards": [
+    {
+     "code": "ja.particle.location_action",
+     "original": "図書館に",
+     "corrected": "図書館で"
+    }
+   ],
+   "hit": true,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "err-03",
+   "said": "昨日、ラーメンを食べます。",
+   "heard": "昨日ラーメンを食べます。",
+   "expect": "ja.verb.tense",
+   "cards": [
+    {
+     "code": "ja.verb.tense",
+     "original": "食べます",
+     "corrected": "食べました"
+    }
+   ],
+   "hit": true,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "err-04",
+   "said": "水が飲みます。",
+   "heard": "水が飲みます。",
+   "expect": "ja.particle.object",
+   "cards": [
+    {
+     "code": "ja.particle.object",
+     "original": "水が",
+     "corrected": "水を"
+    }
+   ],
+   "hit": true,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "err-05",
+   "said": "昨日の映画はおもしろいでした。",
+   "heard": "昨日の映画は面白いでした。",
+   "expect": "ja.adj.i_past",
+   "cards": [],
+   "hit": false,
+   "wrongCards": 0,
+   "dropped": [
+    "ja.adj.i_past:votes"
+   ]
+  },
+  {
+   "id": "err-06",
+   "said": "毎朝、学校を行きます。",
+   "heard": "毎朝学校を行きます。",
+   "expect": "ja.particle.destination",
+   "cards": [
+    {
+     "code": "ja.particle.destination",
+     "original": "学校を",
+     "corrected": "学校に"
+    }
+   ],
+   "hit": true,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "err-07",
+   "said": "先週、東京に行きます。",
+   "heard": "先週東京に行きます。",
+   "expect": "ja.verb.tense",
+   "cards": [
+    {
+     "code": "ja.verb.tense",
+     "original": "行きます",
+     "corrected": "行きました"
+    }
+   ],
+   "hit": true,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "err-08",
+   "said": "レストランに晩ご飯を食べました。",
+   "heard": "レストランに晩御飯を食べました。",
+   "expect": "ja.particle.location_action",
+   "cards": [
+    {
+     "code": "ja.particle.location_action",
+     "original": "レストランに",
+     "corrected": "レストランで"
+    }
+   ],
+   "hit": true,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-01",
+   "said": "私はラーメンが好きです。",
+   "heard": "私はラーメンが好きです。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-02",
+   "said": "週末は友達と映画を見ました。",
+   "heard": "週末は友達と映画を観ました。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-03",
+   "said": "コーヒーのほうが好きです。",
+   "heard": "コーヒーのほうが好きです。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-04",
+   "said": "明日、東京に行きます。",
+   "heard": "明日東京に行きます。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-05",
+   "said": "図書館で勉強します。",
+   "heard": "図書館で勉強します。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-06",
+   "said": "昨日、ラーメンを食べました。",
+   "heard": "昨日、ラーメンを食べました。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-07",
+   "said": "今日は天気がいいです。",
+   "heard": "今日は天気がいいです。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-08",
+   "said": "私は学生です。",
+   "heard": "私は学生です。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-09",
+   "said": "昨日の映画はおもしろかったです。",
+   "heard": "昨日の映画は面白かったです。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-10",
+   "said": "毎日、公園に行きます。",
+   "heard": "毎日公園に行きます。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-11",
+   "said": "友達とレストランでご飯を食べました。",
+   "heard": "友達とレストランでご飯を食べました。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  },
+  {
+   "id": "ok-12",
+   "said": "私の趣味は料理です。",
+   "heard": "私の趣味は料理です。",
+   "expect": null,
+   "cards": [],
+   "hit": null,
+   "wrongCards": 0,
+   "dropped": []
+  }
+ ]
+}

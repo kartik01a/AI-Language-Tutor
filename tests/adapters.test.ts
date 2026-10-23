@@ -3,7 +3,7 @@ import { buildDeepgramUrl, DeepgramStt, parseDeepgram } from "@/lib/providers/de
 import { buildRequestBody, OpenAiLlm, parseResponse } from "@/lib/providers/openai";
 import { strictJsonSchema } from "@/lib/providers/json-schema";
 import { buildSsml } from "@/lib/providers/azure-tts";
-import { turnOutputSchema } from "@/lib/tutor/schemas";
+import { enrichSchema, turnCoreSchema } from "@/lib/tutor/schemas";
 import { editsSchema, explanationsSchema } from "@/lib/tutor/correction-pipeline";
 import { z } from "zod";
 
@@ -12,7 +12,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 describe("strict JSON schemas (OpenAI structured outputs)", () => {
   const verify = z.object({ verdicts: z.array(z.object({ card_id: z.string(), agree: z.boolean() })) });
   const summary = z.object({ did_well: z.array(z.object({ text: z.string().max(160), evidence: z.string() })).max(5), next_focus: z.string() });
-  const all: [string, z.ZodType][] = [["turn", turnOutputSchema], ["edits", editsSchema], ["explanations", explanationsSchema], ["verify", verify], ["summary", summary]];
+  const all: [string, z.ZodType][] = [["turn", turnCoreSchema], ["enrich", enrichSchema], ["edits", editsSchema], ["explanations", explanationsSchema], ["verify", verify], ["summary", summary]];
 
   function walk(node: unknown, visit: (n: Record<string, unknown>) => void) {
     if (Array.isArray(node)) node.forEach((n) => walk(n, visit));
@@ -207,8 +207,8 @@ describe("schema warm-up", () => {
   it("calls every strict schema once and tolerates failures", async () => {
     const llm = new FakeLlm((n) => (n === 2 ? new Error("down") : {}));
     const r = await warmUpSchemas(llm);
-    expect(llm.calls.map((c) => c.schema?.name).sort()).toEqual(["edit_candidates", "explanations", "session_summary", "turn_output", "verify_corrections"]);
-    expect(r.warmed).toHaveLength(4);
+    expect(llm.calls.map((c) => c.schema?.name).sort()).toEqual(["edit_candidates", "explanations", "session_summary", "turn_enrichment", "turn_output", "verify_corrections"]);
+    expect(r.warmed).toHaveLength(5);
     expect(r.failed).toHaveLength(1);
   });
 });

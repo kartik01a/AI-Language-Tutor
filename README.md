@@ -59,8 +59,8 @@ OPENAI_API_KEY=your-openai-key
 AZURE_SPEECH_KEY=your-azure-key
 AZURE_SPEECH_REGION=centralindia     # the region shown in Azure
 
-# optional: change the LLM used for the tutor's turns
-# OPENAI_MODEL_TURN=gpt-6-luna
+# optional: change the LLM (default gpt-5.6-luna)
+# OPENAI_MODEL_TURN=gpt-5.6-luna
 ```
 
 Never paste keys into chat, issues or commits. `.env.local` is already git-ignored.
@@ -165,7 +165,7 @@ Not built yet: accounts and sign-in, a real database store (sessions live in mem
 trial and waitlist screens, German and English tutors. Because there is no authentication, **the server refuses to start in
 production mode**. Run it locally only.
 
-Known: time to the first spoken word is about 4–6 seconds on a laptop (target 2.5 s), and recognition of accented
+Known: time to the first spoken word is about 3.5 seconds on a laptop (target 2.5 s), and recognition of accented
 Japanese is being tuned. See [`docs/17-risks-and-open-decisions.md`](docs/17-risks-and-open-decisions.md).
 
 ## Privacy

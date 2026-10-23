@@ -7,6 +7,7 @@ import { createInitialState, step } from "@/lib/tutor/dialogue-machine";
 import { processLearnerTurn } from "@/lib/tutor/turn-pipeline";
 import { fastPathRecastAllowed, runCorrectionPipeline } from "@/lib/tutor/correction-pipeline";
 import { translateLines } from "@/lib/tutor/translate";
+import { enrichTurn, questionOf } from "@/lib/tutor/enrich";
 import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, confirmLine, tidyHeard, templateFor, type Spoken } from "@/lib/tutor/templates";
 import { TUTORS } from "@/lib/tutor/tutors";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
@@ -26,6 +27,8 @@ export interface ServiceDeps {
   config: AppConfig;
   now?: () => number;
   newId?: () => string;
+  /** Called on every session request (the runtime uses it to keep provider connections warm). */
+  onActivity?: () => void;
 }
 
 export class ServiceError extends Error {
@@ -61,6 +64,7 @@ export class SessionService {
   }
 
   async createSession(input: { level: Level; strictness?: Strictness; firstName?: string }) {
+    this.d.onActivity?.();
     const b = await budgetStatus(this.d.spend, this.d.config.AI_MONTHLY_BUDGET_USD, new Date(this.now()));
     if (b.status === "exhausted") throw new ServiceError("BUDGET_PAUSED", "Practice is paused for now.");
     const tutor = TUTORS["yuki-ja"];
@@ -181,7 +185,7 @@ export class SessionService {
       skills: rec.skills,
       nonUnderstandingRate: m.learnerTurns === 0 ? 0 : m.unclearTurns / m.learnerTurns,
     });
-    for (const u of usage) await this.addSpend(rec, llmCost("gpt-6-luna", u));
+    for (const u of usage) await this.addSpend(rec, llmCost(u.model ?? "gpt-6-luna", u));
     rec.summary = summary;
     rec.skills = summary.skills;
     // If a concurrent request already stored a summary, prefer that one.
@@ -219,6 +223,7 @@ export class SessionService {
   }
 
   async *handleEvent(sessionId: string, ev: ClientEvent): AsyncGenerator<OutFrame> {
+    this.d.onActivity?.();
     if (ev.e === "confirm_heard") {
       yield* this.confirmHeard(sessionId, ev.yes);
       return;
@@ -292,6 +297,7 @@ export class SessionService {
     clip: { speechMs: number; clipMs: number },
     opts: { precomputed?: { asr: SttResult; gate: GateOutcome }; rejectAs?: "UNCLEAR_AUDIO"; turnId?: string } = {},
   ): AsyncGenerator<OutFrame> {
+    this.d.onActivity?.();
     const { rec, rev } = await this.load(sessionId);
     // A fresh recording supersedes an unanswered "Did you say …?" (it already used up an attempt).
     if (!opts.precomputed) rec.pendingConfirm = null;
@@ -327,7 +333,7 @@ export class SessionService {
 
     // Costs: STT only if it was actually called; LLM per call.
     if (result.asr && !opts.precomputed) await this.addSpend(rec, sttCost("deepgram-nova-3", clip.clipMs / 1000));
-    for (const u of result.usage) await this.addSpend(rec, llmCost("gpt-6-luna", u));
+    for (const u of result.usage) await this.addSpend(rec, llmCost(u.model ?? "gpt-6-luna", u));
 
     // What the learner sees: unclear turns never show a confident-looking transcript.
     // "Unclear" (transcript hidden) means we could not trust what was heard. When the recogniser was
@@ -361,10 +367,21 @@ export class SessionService {
     }
     yield this.emit(rec, { t: "category", category: result.category, action: result.action.kind });
 
+    const addWords = (words: { lemma: string; reading: string | null; meaning: string }[]) => {
+      for (const w of words) if (!rec.metrics.wordsIntroduced.some((x) => x.lemma === w.lemma)) rec.metrics.wordsIntroduced.push(w);
+    };
+    // The live call no longer returns hints/words (they cost ~80 output tokens of waiting); ask for them beside
+    // the reply and collect the answer before the turn is saved. Older/demo outputs may still carry them inline.
+    let enrichP: ReturnType<typeof enrichTurn> | null = null;
     if (result.analysis) {
-      rec.lastHints = result.analysis.hints;
-      for (const w of result.analysis.words_introduced) {
-        if (!rec.metrics.wordsIntroduced.some((x) => x.lemma === w.lemma)) rec.metrics.wordsIntroduced.push(w);
+      if (result.analysis.hints) rec.lastHints = result.analysis.hints;
+      addWords(result.analysis.words_introduced ?? []);
+      if (!result.analysis.hints && result.replySentences && result.asr) {
+        rec.lastHints = null; // the old hint answered the old question
+        enrichP = enrichTurn(this.d.llm, {
+          level: rec.level, question: questionOf(result.replySentences), tutorReply: result.replySentences,
+          learnerText: result.asr.text.replace(/ /g, ""),
+        });
       }
     }
     // A confirmation prompt is not a turn: the learner's "Yes" (or "No") is.
@@ -440,6 +457,15 @@ export class SessionService {
 
     yield this.emit(rec, { t: "limits", activeSeconds: Math.round(rec.state.activeSeconds), wrapUp: rec.state.wrapUp, reason: rec.state.wrapUpReason });
     yield* this.finishIfEnded(rec);
+    if (enrichP) {
+      // It has been running while the tutor spoke, so this wait is normally zero; never hold the turn for long.
+      const e = await Promise.race([enrichP, new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+      if (e) {
+        rec.lastHints = e.enrichment.hints;
+        addWords(e.enrichment.words_introduced);
+        await this.addSpend(rec, llmCost(e.usage.model ?? "gpt-6-luna", e.usage));
+      }
+    }
     yield* this.persist(rec, rev);
     yield this.emit(rec, {
       t: "turn_end", stateVersion: rec.state.stateVersion, expect: isEnded(rec) ? "end" : "learner", phase: rec.state.phase,
@@ -450,7 +476,7 @@ export class SessionService {
     if (translation) {
       const t = await translation.promise;
       if (t) {
-        await this.d.spend.add(monthKey(new Date(this.now())), llmCost("gpt-6-luna", t.usage));
+        await this.d.spend.add(monthKey(new Date(this.now())), llmCost(t.usage.model ?? "gpt-6-luna", t.usage));
         for (let k = 0; k < t.items.length; k++) {
           yield this.emit(rec, { t: "translation", messageId: translation.messageId, index: translation.indices[k], text: t.items[k] });
         }
@@ -464,7 +490,7 @@ export class SessionService {
       if (out) {
         // Correction-call cost goes to the global monthly spend (the kill switch); per-session cost
         // attribution moves to the usage ledger when the database store lands.
-        for (const u of out.usage) await this.d.spend.add(monthKey(new Date(this.now())), llmCost("gpt-6-luna", u));
+        for (const u of out.usage) await this.d.spend.add(monthKey(new Date(this.now())), llmCost(u.model ?? "gpt-6-luna", u));
         const cards = out.cards.map((c) => ({ ...c, id: `${turnId}-${c.id}` }));
         await this.d.store.addCorrection(rec.id, { turnId, learnerText: result.asr?.text.replace(/ /g, "") ?? "", cards, dropped: out.dropped });
         if (cards.length > 0) yield this.emit(rec, { t: "corrections", turnId, cards });

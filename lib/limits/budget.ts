@@ -1,13 +1,15 @@
 // Cost accounting and the global kill switch (docs/09 §8, docs/12). Prices are a versioned
 // table in code; re-verify before relying on them (last checked 2026-10-14).
 
-export const PRICE_TABLE_VERSION = "2026-10-14";
+export const PRICE_TABLE_VERSION = "2026-10-24";
 
 export const PRICES = {
   stt: { "deepgram-nova-3": { perMinute: 0.0052 } },
   llm: {
     // per 1M tokens
     "gpt-6-luna": { input: 0.1, cachedInput: 0.01, cacheWrite: 0.125, output: 0.5 },
+    // Aggregator-reported after the 2026-07-30 price cut; confirm on OpenAI's pricing page.
+    "gpt-5.6-luna": { input: 0.2, cachedInput: 0.02, cacheWrite: 0.25, output: 1.2 },
   },
   tts: { "azure-standard": { perMillionChars: 15 } },
 } as const;
@@ -17,10 +19,11 @@ export function sttCost(model: keyof typeof PRICES.stt, audioSeconds: number): n
 }
 
 export function llmCost(
-  model: keyof typeof PRICES.llm,
+  model: string,
   u: { inputTokens: number; cachedInputTokens: number; outputTokens: number },
 ): number {
-  const p = PRICES.llm[model];
+  // An unknown model is billed at the dearest known rate, so the kill switch errs on the safe side.
+  const p = PRICES.llm[model as keyof typeof PRICES.llm] ?? PRICES.llm["gpt-5.6-luna"];
   const fresh = Math.max(0, u.inputTokens - u.cachedInputTokens);
   return (fresh * p.input + u.cachedInputTokens * p.cachedInput + u.outputTokens * p.output) / 1e6;
 }

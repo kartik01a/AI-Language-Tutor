@@ -22,6 +22,8 @@ export interface SttProvider {
 }
 
 export interface LlmUsage {
+  /** Which model produced this usage (prices differ per model). */
+  model?: string;
   inputTokens: number;
   cachedInputTokens: number;
   outputTokens: number;

@@ -42,8 +42,6 @@ const base = (n: number, category: TurnOutput["analysis"]["category"], teach?: {
   return {
     analysis: { category, topic: "free talk", meaning_summary: "learner answered", recovered_fragment: null, off_topic_reason: null, meta: { kind: null, word: null }, goal_progress: [], recast_candidate: null },
     reply: { recast: null, sentences: r.sentences, translation: r.translation, teach_phrase: teach ?? null },
-    hints: { hint: r.hint[0], starter: r.hint[1], example: r.hint[2], example_translation: "(example)" },
-    words_introduced: [],
   };
 };
 
@@ -53,6 +51,10 @@ export class DemoLlm implements LlmProvider {
   private n = 0;
   async turn(req: LlmRequest) {
     // Correction pipeline calls: deterministic, so all samples agree.
+    if (req.system.startsWith("HINTS AND WORDS")) {
+      const r = REPLIES[Math.max(0, this.n - 1) % REPLIES.length];
+      return { json: { hints: { hint: r.hint[0], starter: r.hint[1], example: r.hint[2], example_translation: "(example)" }, words_introduced: [] }, usage: USAGE };
+    }
     if (req.system.startsWith("EDIT DETECTION")) {
       const edits = [];
       if (req.user.includes("こうえん") && req.user.includes(":を")) edits.push({ code: "ja.particle.destination", original: "を", corrected: "に", token_start: 2, token_end: 3, type: "grammar" });

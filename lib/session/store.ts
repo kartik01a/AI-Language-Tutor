@@ -1,4 +1,4 @@
-import type { TurnOutput } from "@/lib/tutor/schemas";
+import type { Enrichment } from "@/lib/tutor/schemas";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueState } from "@/lib/tutor/types";
 import type { SttResult } from "@/lib/providers/types";
@@ -38,7 +38,7 @@ export interface SessionRecord {
   firstName: string;
   state: DialogueState;
   history: HistoryItem[];
-  lastHints: TurnOutput["hints"] | null;
+  lastHints: Enrichment["hints"] | null;
   currentQuestion: { text: string; expects: "open" | "closed" | "repetition" | "topic" } | null;
   /** ms epoch of the last accounted activity (active-time accounting is server-side). */
   lastActivityAt: number;

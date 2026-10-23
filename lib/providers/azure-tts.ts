@@ -37,18 +37,43 @@ export interface AzureTtsOptions {
 }
 
 export class AzureTts implements TtsProvider {
+  /**
+   * Synthesizers keep their WebSocket to Azure open between calls. Creating a fresh one per sentence paid
+   * a new TLS + WebSocket handshake each time (~0.4 s before the first audio byte).
+   */
+  private idle: { synth: sdk.SpeechSynthesizer; timer: ReturnType<typeof setTimeout> }[] = [];
+
   constructor(private o: AzureTtsOptions) {}
 
-  async synthesize(text: string, voice: VoiceConfig): Promise<TtsResult> {
+  private acquire(wav: boolean): sdk.SpeechSynthesizer {
+    const hit = this.idle.pop();
+    if (hit) {
+      clearTimeout(hit.timer);
+      return hit.synth;
+    }
     const config = sdk.SpeechConfig.fromSubscription(this.o.key, this.o.region);
-    const wav = this.o.format === "wav16k";
     config.speechSynthesisOutputFormat = wav ? sdk.SpeechSynthesisOutputFormat.Riff16Khz16BitMonoPcm : sdk.SpeechSynthesisOutputFormat.Audio24Khz48KBitRateMonoMp3;
     // `null` audio config: don't play through a speaker, just return the bytes.
-    const synth = new sdk.SpeechSynthesizer(config, undefined as unknown as sdk.AudioConfig);
+    return new sdk.SpeechSynthesizer(config, undefined as unknown as sdk.AudioConfig);
+  }
+
+  private release(synth: sdk.SpeechSynthesizer): void {
+    synth.visemeReceived = undefined as unknown as sdk.SpeechSynthesizer["visemeReceived"];
+    if (this.idle.length >= 4) return synth.close();
+    // Close after a quiet minute so an abandoned session doesn't hold sockets open.
+    const entry = { synth, timer: setTimeout(() => { this.idle = this.idle.filter((e) => e !== entry); synth.close(); }, 60_000) };
+    entry.timer.unref?.();
+    this.idle.push(entry);
+  }
+
+  async synthesize(text: string, voice: VoiceConfig): Promise<TtsResult> {
+    const wav = this.o.format === "wav16k";
+    const synth = this.acquire(wav);
     const visemes: AzureVisemeEvent[] = [];
     synth.visemeReceived = (_s, e) => visemes.push({ visemeId: e.visemeId, audioOffset: e.audioOffset });
 
     const ssml = buildSsml(text, voice, this.o.overridesFor?.(text) ?? []);
+    let failed = false;
     try {
       const result = await new Promise<sdk.SpeechSynthesisResult>((resolve, reject) =>
         synth.speakSsmlAsync(ssml, (r) => (r.reason === sdk.ResultReason.SynthesizingAudioCompleted ? resolve(r) : reject(new Error(r.errorDetails || `TTS failed (${sdk.ResultReason[r.reason]})`))), reject),
@@ -63,8 +88,13 @@ export class AzureTts implements TtsProvider {
         // Azure bills each kanji as two characters; markup counts too (docs/12).
         billableChars: [...ssml.replace(/<speak[^>]*>|<\/speak>|<voice[^>]*>|<\/voice>/g, "")].reduce((n, ch) => n + (/[㐀-鿿]/.test(ch) ? 2 : 1), 0),
       };
+    } catch (e) {
+      failed = true;
+      throw e;
     } finally {
-      synth.close();
+      // A synthesizer that errored may hold a broken connection: discard it instead of reusing it.
+      if (failed) synth.close();
+      else this.release(synth);
     }
   }
 }
