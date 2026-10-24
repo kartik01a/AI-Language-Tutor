@@ -8,7 +8,9 @@ import { annotateTranscript } from "./gates";
 // Prompt architecture (docs/06 §3): a static, cacheable prefix + a dynamic suffix.
 // The static prefix must be byte-identical across turns for a given tutor × level.
 
-export const PROMPT_VERSION = "turn@2";
+export type CoachMode = "tutor" | "casual";
+
+export const PROMPT_VERSION = "turn@3";
 
 const LEVEL_RULES: Record<Level, string> = {
   A1: "1–2 very short sentences (≤12 words). High-frequency words only. Prefer yes/no or either/or questions.",
@@ -37,7 +39,9 @@ export function buildStaticPrefix(tutor: TutorConfig, level: Level): string {
     "- Then ask EXACTLY ONE natural follow-up question that builds on their answer (not an unrelated new question). The question is the last sentence.",
     "- Keep the language simple for the level, in your polite speaking style.",
     "",
-    "TUTORING (you are also their teacher)",
+    "TUTORING (you are also their teacher; the dynamic part of each request says whether the mode is TUTOR or CASUAL)",
+    "- In CASUAL mode never correct anything: leave `analysis.recast_candidate` and `reply.recast` null and just chat.",
+    "- In TUTOR mode also fix a sentence that is grammatical but that a native speaker would not say (unnatural phrasing), using ja.phrasing.unnatural. Example: 「私はおにぎりがおいしいです」 → recast 「おにぎりはおいしいです」.",
     "- If the learner's sentence has a clear grammar mistake, or is an unfinished sentence (missing the verb or です, or a dropped particle), AND the words involved were recognised with high confidence: set `analysis.recast_candidate` to the smallest edit (`original` and `corrected` are the exact words) using one of the ERROR CODES below, and set `reply.recast` to ONLY the learner's whole sentence, corrected and natural for their level (no quotes, no phrases like 'you can say'). The system says it aloud before your reply, so do NOT repeat or hint at the correction in `reply.sentences` (do not silently re-say the fixed sentence either): just carry on the conversation.",
     "  Example: learner 「昨日、公園を行きました」 → recast_candidate {error_code: ja.particle.destination, original: を, corrected: に}, recast 「昨日、公園に行きました」.",
     "  Example: learner 「昨日、ラーメン」 (unfinished) → recast_candidate {error_code: ja.sentence.incomplete, original: 昨日ラーメン, corrected: 昨日ラーメンを食べました}, recast 「昨日、ラーメンを食べました」.",
@@ -70,6 +74,7 @@ export interface PromptContext {
   strictness: Strictness;
   learner: { firstName: string; recurringMistakes: string[] };
   session: {
+    coachMode?: CoachMode;
     topic: string | null;
     goals: string[];
     simplifyMode: boolean;
@@ -94,6 +99,9 @@ export function buildTurnPrompt(ctx: PromptContext): { system: string; user: str
   const user = [
     `Learner: ${ctx.learner.firstName} | level ${ctx.level} | correction strictness ${ctx.strictness}`,
     ctx.learner.recurringMistakes.length ? `Recurring mistakes: ${ctx.learner.recurringMistakes.slice(0, 2).join(", ")}` : "Recurring mistakes: none yet",
+    (session.coachMode ?? "tutor") === "tutor"
+      ? "Mode: TUTOR. The learner wants to be corrected: fix every clear mistake, unfinished or unnatural sentence as described in TUTORING."
+      : "Mode: CASUAL. The learner only wants a relaxed chat: do not correct anything (recast_candidate and recast must be null).",
     `Topic: ${session.topic ?? "(learner is choosing a topic)"}`,
     session.goals.length ? `Private goals: ${session.goals.join("; ")}` : "",
     session.simplifyMode ? "SIMPLIFY MODE: use simpler vocabulary and closed questions." : "",

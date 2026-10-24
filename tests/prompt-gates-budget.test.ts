@@ -34,6 +34,17 @@ describe("prompt", () => {
     expect(user).not.toMatch(/@|email/i);
   });
 
+  it("tells the model whether it is in Tutor or Casual mode, and lists the error codes it may use", () => {
+    const c = ctx() as ReturnType<typeof ctx> & { session: { coachMode?: "tutor" | "casual" } };
+    expect(buildTurnPrompt(c).user).toContain("Mode: TUTOR");
+    c.session.coachMode = "casual";
+    const casual = buildTurnPrompt(c);
+    expect(casual.user).toContain("Mode: CASUAL");
+    expect(casual.user).toContain("must be null");
+    expect(casual.system).toContain("ja.phrasing.unnatural");
+    expect(casual.system).toContain("ja.sentence.incomplete");
+  });
+
   it("tells the model to wrap up without opening a new topic", () => {
     const c = ctx();
     c.session.wrapUp = true;

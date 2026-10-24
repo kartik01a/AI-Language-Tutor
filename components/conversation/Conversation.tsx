@@ -9,6 +9,7 @@ import { readFrames } from "./stream";
 import { initialUi, reducer, STATUS_LABEL } from "./reducer";
 import { CorrectionCards } from "./CorrectionCards";
 import { SummaryPanel } from "./SummaryPanel";
+import { ModeToggle, useCoachMode, type CoachMode } from "./ModeToggle";
 import { PhoneShell } from "@/components/ui/PhoneShell";
 import { BubbleIcon, BulbIcon, MicIcon, StopIcon } from "@/components/ui/icons";
 
@@ -179,6 +180,15 @@ export function Conversation(p: ConversationProps) {
   }, []);
 
   // ---- start (must run inside the user's tap so audio and mic unlock) ----
+  // Tutor (corrections) is the default; the choice is remembered on this device.
+  const [coachMode, setStoredMode] = useCoachMode();
+  const changeMode = (m: CoachMode) => {
+    setStoredMode(m);
+    if (sessionId.current) {
+      void fetch(`/api/sessions/${sessionId.current}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ coachMode: m }) }).catch(() => {});
+    }
+  };
+
   const begin = async () => {
     dispatch({ type: "phase", phase: "starting" });
     try {
@@ -195,7 +205,7 @@ export function Conversation(p: ConversationProps) {
       dispatch({ type: "error", message: MIC_HELP[classifyMicError(e)], fatal: true });
       return;
     }
-    const res = await fetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ level: p.level }) });
+    const res = await fetch("/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ level: p.level, coachMode }) });
     const j = await res.json();
     if (!res.ok) {
       dispatch({ type: "error", message: j.error?.message ?? "Could not start", fatal: true });
@@ -338,6 +348,15 @@ export function Conversation(p: ConversationProps) {
           </span>
         </span>
         <span className="flex items-center gap-2">
+          {ui.sessionId && !ended && ui.phase !== "error" && (
+            <button
+              onClick={() => changeMode(coachMode === "tutor" ? "casual" : "tutor")}
+              aria-label={`Mode: ${coachMode}. Tap to switch`}
+              className="rounded-full bg-iris-100 px-3 py-1.5 text-xs font-extrabold text-iris-700 transition active:scale-95"
+            >
+              {coachMode === "tutor" ? "Tutor" : "Casual"}
+            </button>
+          )}
           {ui.wrapUp && !ended && <span className="rounded-full bg-amber-card px-2.5 py-1 text-xs font-bold text-amber-ink">Wrapping up…</span>}
           {ui.sessionId && !ended && ui.phase !== "error" && (
             <button
@@ -432,6 +451,7 @@ export function Conversation(p: ConversationProps) {
         <SummaryPanel sessionId={ui.sessionId} />
       ) : intro ? (
         <footer className="flex flex-col items-center gap-2 rounded-t-[28px] bg-white px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 shadow-[0_-8px_24px_rgba(28,27,46,0.08)]">
+          <ModeToggle mode={coachMode} onChange={changeMode} />
           <button onClick={begin} className="w-full rounded-full bg-iris-500 px-6 py-3.5 text-lg font-extrabold text-white shadow-md transition active:scale-[0.97]">
             Start talking with {p.tutorName}
           </button>

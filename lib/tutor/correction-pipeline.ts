@@ -168,7 +168,7 @@ export async function runCorrectionPipeline(llm: LlmProvider, input: PipelineInp
   const k = input.samples ?? 3;
   const usage: LlmUsage[] = [];
   // Unfinished sentences are coached by the live turn call; the verified card pipeline stays on grammar errors.
-  const taxonomy = taxonomyFor(input.lang).filter((t) => t.code !== "ja.sentence.incomplete");
+  const taxonomy = taxonomyFor(input.lang).filter((t) => t.code !== "ja.sentence.incomplete" && t.code !== "ja.phrasing.unnatural");
   const empty: PipelineResult = { cards: [], dropped: [], usage, validSamples: 0 };
   if (taxonomy.length === 0 || input.words.length === 0) return empty;
 
@@ -296,7 +296,7 @@ export function fastPathRecastAllowed(
   const sev = tax.severity[ctx.level];
   if (sev === 0) return false;
   if (ctx.strictness === "relaxed") return !!ctx.relaxedRecastTurn && sev === 3 && !!ctx.recurrent?.has(candidate.error_code);
-  if (sev < 2) return false;
+  if (sev < (ctx.strictness === "strict" ? 1 : 2)) return false;
   // The corrected phrase must actually occur in what was heard, otherwise it isn't an echo of this turn.
   const heard = ctx.words.map((w) => w.w).join("");
   const around = candidate.original.replace(/\s/g, "");

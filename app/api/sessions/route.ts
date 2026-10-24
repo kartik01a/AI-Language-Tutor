@@ -5,6 +5,7 @@ import { ServiceError } from "@/lib/session/service";
 const body = z.object({
   level: z.enum(["A1", "A2", "B1", "B2"]).default("A2"),
   strictness: z.enum(["relaxed", "balanced", "strict"]).optional(),
+  coachMode: z.enum(["tutor", "casual"]).optional(),
   firstName: z.string().trim().max(40).optional(),
 });
 

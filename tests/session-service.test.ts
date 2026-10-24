@@ -318,6 +318,27 @@ describe("corrections in the live session", () => {
     expect(card && card.t === "corrections" && card.cards[0]).toMatchObject({ errorCode: "ja.verb.tense", corrected: "たべました" });
   });
 
+  describe("Tutor and Casual mode", () => {
+    it("Casual mode never corrects: no spoken fix, no cards, no detection calls", async () => {
+      const { svc, sessionId } = await started();
+      await svc.setCoachMode(sessionId, "casual");
+      for (let i = 0; i < 5; i++) await turn(svc, sessionId);
+      const r = await turn(svc, sessionId); // the demo script's tense error
+      const texts = r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : []));
+      expect(texts.join("")).not.toContain("と言うといいですよ");
+      expect(r.events.find((e) => e.t === "corrections")).toBeUndefined();
+    });
+
+    it("switching back to Tutor mode makes the next mistake get fixed again", async () => {
+      const { svc, sessionId } = await started();
+      await svc.setCoachMode(sessionId, "casual");
+      await svc.setCoachMode(sessionId, "tutor");
+      for (let i = 0; i < 5; i++) await turn(svc, sessionId);
+      const r = await turn(svc, sessionId);
+      expect(r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : []))[0]).toContain("と言うといいですよ");
+    });
+  });
+
   it("Relaxed strictness shows the answer immediately; reports are stored for evaluation", async () => {
     const s = setup();
     const { sessionId } = await s.svc.createSession({ level: "A2", strictness: "relaxed" });

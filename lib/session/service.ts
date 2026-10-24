@@ -7,6 +7,7 @@ import { createInitialState, step } from "@/lib/tutor/dialogue-machine";
 import { processLearnerTurn } from "@/lib/tutor/turn-pipeline";
 import { fastPathRecastAllowed, runCorrectionPipeline } from "@/lib/tutor/correction-pipeline";
 import { translateLines } from "@/lib/tutor/translate";
+import type { CoachMode } from "@/lib/tutor/prompt";
 import { enrichTurn, questionOf } from "@/lib/tutor/enrich";
 import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, confirmLine, tidyHeard, templateFor, type Spoken, correctionLine, fallbackHint } from "@/lib/tutor/templates";
 import { TUTORS } from "@/lib/tutor/tutors";
@@ -63,13 +64,13 @@ export class SessionService {
     };
   }
 
-  async createSession(input: { level: Level; strictness?: Strictness; firstName?: string }) {
+  async createSession(input: { level: Level; strictness?: Strictness; firstName?: string; coachMode?: CoachMode }) {
     this.d.onActivity?.();
     const b = await budgetStatus(this.d.spend, this.d.config.AI_MONTHLY_BUDGET_USD, new Date(this.now()));
     if (b.status === "exhausted") throw new ServiceError("BUDGET_PAUSED", "Practice is paused for now.");
     const tutor = TUTORS["yuki-ja"];
     const rec: SessionRecord = {
-      id: this.newId(), tutorId: tutor.id, level: input.level, strictness: input.strictness ?? "balanced",
+      id: this.newId(), tutorId: tutor.id, level: input.level, strictness: input.strictness ?? "strict", coachMode: input.coachMode ?? "tutor",
       firstName: input.firstName ?? "Learner", state: createInitialState(), history: [], lastHints: null,
       currentQuestion: null, lastActivityAt: this.now(), seq: 0, costUsd: 0, reports: [], pendingConfirm: null,
       metrics: { learnerSpeechMs: 0, learnerTurns: 0, unclearTurns: 0, providerErrors: 0, maxHintLevel: 0, hintsUsed: 0, wordsIntroduced: [] },
@@ -181,6 +182,13 @@ export class SessionService {
     if (level === 1) return { text: h.hint };
     if (level === 2) return { text: h.starter };
     return { text: h.example, translation: h.example_translation };
+  }
+
+  /** The learner switches between Tutor (corrections) and Casual (just talk) at any time. */
+  async setCoachMode(sessionId: string, mode: CoachMode): Promise<void> {
+    const { rec, rev } = await this.load(sessionId);
+    rec.coachMode = mode;
+    await this.d.store.put(rec, rev);
   }
 
   /** End-of-session analysis. Computed once, after the conversation has ended. */
@@ -346,7 +354,7 @@ export class SessionService {
           tutor, level: rec.level, strictness: rec.strictness,
           learner: { firstName: rec.firstName, recurringMistakes: [] },
           session: {
-            topic: rec.state.topic?.label ?? null, goals: [], simplifyMode: false, wrapUp: rec.state.wrapUp,
+            coachMode: rec.coachMode, topic: rec.state.topic?.label ?? null, goals: [], simplifyMode: false, wrapUp: rec.state.wrapUp,
             history: rec.history, currentQuestion: rec.currentQuestion,
           },
         },
@@ -417,7 +425,7 @@ export class SessionService {
 
     // Corrections start now, in parallel with the tutor speaking, and never block the reply.
     const allowCorrections =
-      result.category === "UNDERSTOOD" && result.asr !== null && result.gate !== null &&
+      rec.coachMode === "tutor" && result.category === "UNDERSTOOD" && result.asr !== null && result.gate !== null &&
       (result.action.kind === "RESPOND" || result.action.kind === "ACKNOWLEDGE_REPETITION") && result.action.allowCorrections;
     const counts: Record<string, number> = {};
     for (const entry of await this.d.store.listCorrections(rec.id)) for (const c of entry.cards) counts[c.errorCode] = (counts[c.errorCode] ?? 0) + 1;

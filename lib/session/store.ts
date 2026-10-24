@@ -1,4 +1,5 @@
 import type { Enrichment } from "@/lib/tutor/schemas";
+import type { CoachMode } from "@/lib/tutor/prompt";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueState } from "@/lib/tutor/types";
 import type { SttResult } from "@/lib/providers/types";
@@ -35,6 +36,8 @@ export interface SessionRecord {
   tutorId: string;
   level: Level;
   strictness: Strictness;
+  /** tutor = fix mistakes aloud and with cards; casual = just talk, never correct. Switchable mid-conversation. */
+  coachMode: CoachMode;
   firstName: string;
   state: DialogueState;
   history: HistoryItem[];

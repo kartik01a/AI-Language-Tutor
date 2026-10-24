@@ -68,6 +68,7 @@ Each 5-minute session ends with a summary that feeds the learner's progress.
 | 15 | [Deployment & operations](15-deployment-and-operations.md) | Environments, all env vars, Cloud Run config, CI/CD, scheduled jobs, alerts, runbooks |
 | 16 | [Implementation roadmap](16-implementation-roadmap.md) | Phases 0–7 with scope, deliverables, acceptance, risks, effort |
 | 17 | [Risks & open decisions](17-risks-and-open-decisions.md) | Risk register, open decisions, hypotheses, deferred items, limitations, pre-launch must-fixes |
+| 18 | [Tutor & Casual mode](18-tutor-and-casual-mode.md) | Learner-selectable correction behaviour (added after real-use testing) |
 | — | [research/provider-comparison.md](research/provider-comparison.md) | All provider tables in one place |
 | — | [research/sources.md](research/sources.md) | Every cited source (about 300), grouped by research note |
 | — | [research/notes/](research/notes/) | The five full research reports (evidence behind every recommendation) |
