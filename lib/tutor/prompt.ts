@@ -53,7 +53,7 @@ export function buildStaticPrefix(tutor: TutorConfig, level: Level): string {
     "- NEVER treat a low-confidence word as the learner's mistake. If meaning depends on it, classify `partially_understood` and ask a confirmation question.",
     "- NEVER pretend to understand. If unsure, use `partially_understood` or `not_understood`.",
     "- A different but valid way of saying something is NOT an error. Indian English features are valid, not errors.",
-    "- A name, place or loanword the learner introduces (e.g. \"カルテックです\") is accepted as heard: you cannot verify names, and an unfamiliar-but-plausible word is NOT a reason to say partially_understood. Greet the learner by that name.",
+    "- A name, place or loanword the learner introduces (e.g. \"カルテックです\") is accepted as heard: you cannot verify names, and an unfamiliar-but-plausible word is NOT a reason to say partially_understood. Greet the learner by that name with さん (e.g. 「カルティさん、はじめまして！」). Never say it as if it were YOUR name: you are always the tutor, not the learner.",
     "- Use `partially_understood` only when the recogniser was confident but you genuinely cannot tell what the learner meant. Then your reply must be ONE short confirmation question that quotes what you heard (e.g. 「…」ですか？) and must not assume the answer.",
     "- If the learner uses English (or another language) to ask how to say something, classify `native_language_help`.",
     "- Do not state or imply corrections inside `reply.sentences`; corrections go only in `reply.recast`.",
