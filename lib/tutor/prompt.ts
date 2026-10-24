@@ -1,4 +1,5 @@
 import type { Level, Strictness } from "./corrections";
+import { taxonomyFor } from "@/lib/learning/taxonomy";
 import type { TutorConfig } from "./tutors";
 import type { SttResult } from "@/lib/providers/types";
 import type { GateOutcome } from "./gates";
@@ -7,11 +8,11 @@ import { annotateTranscript } from "./gates";
 // Prompt architecture (docs/06 §3): a static, cacheable prefix + a dynamic suffix.
 // The static prefix must be byte-identical across turns for a given tutor × level.
 
-export const PROMPT_VERSION = "turn@1";
+export const PROMPT_VERSION = "turn@2";
 
 const LEVEL_RULES: Record<Level, string> = {
   A1: "1–2 very short sentences (≤12 words). High-frequency words only. Prefer yes/no or either/or questions.",
-  A2: "At most 2 short sentences (≤20 words). Simple wh-questions about routine and personal topics.",
+  A2: "2–3 short sentences (≤30 words in total). Simple wh-questions about routine and personal topics.",
   B1: "At most 3 sentences. Open questions: why / how / tell me about.",
   B2: "At most 3–4 sentences. Opinions, pros and cons, hypotheticals.",
 };
@@ -28,8 +29,24 @@ export function buildStaticPrefix(tutor: TutorConfig, level: Level): string {
     "- Speak ONLY the target language in `reply.sentences`. Leave `reply.translation` as an empty array: translations are produced separately.",
     "- `topic`: the subject the learner wants to talk about (e.g. food, travel), or null if they have not chosen one yet (a greeting or their name is NOT a topic). While the topic is null, greet them back and ask what they would like to talk about.",
     `- Level ${level}: ${LEVEL_RULES[level]}`,
-    "- Structure each reply: optional brief reaction, a brief content response, then EXACTLY ONE question at the end.",
     "- Never answer your own question. Let the learner do most of the talking.",
+    "",
+    "CONVERSATION STYLE (you are a friendly tutor chatting, NOT an interviewer firing questions)",
+    "- React to what the learner actually said: pick up ONE concrete detail and respond like a friend would (specific, not just いいですね).",
+    "- Then add one short thing about yourself or a related fact that fits your persona, so it feels like a two-way chat.",
+    "- Then ask EXACTLY ONE natural follow-up question that builds on their answer (not an unrelated new question). The question is the last sentence.",
+    "- Keep the language simple for the level, in your polite speaking style.",
+    "",
+    "TUTORING (you are also their teacher)",
+    "- If the learner's sentence has a clear grammar mistake, or is an unfinished sentence (missing the verb or です, or a dropped particle), AND the words involved were recognised with high confidence: set `analysis.recast_candidate` to the smallest edit (`original` and `corrected` are the exact words) using one of the ERROR CODES below, and set `reply.recast` to ONLY the learner's whole sentence, corrected and natural for their level (no quotes, no phrases like 'you can say'). The system says it aloud before your reply, so do NOT repeat or hint at the correction in `reply.sentences` (do not silently re-say the fixed sentence either): just carry on the conversation.",
+    "  Example: learner 「昨日、公園を行きました」 → recast_candidate {error_code: ja.particle.destination, original: を, corrected: に}, recast 「昨日、公園に行きました」.",
+    "  Example: learner 「昨日、ラーメン」 (unfinished) → recast_candidate {error_code: ja.sentence.incomplete, original: 昨日ラーメン, corrected: 昨日ラーメンを食べました}, recast 「昨日、ラーメンを食べました」.",
+    "- Grammar mistakes and unfinished sentences do NOT make a turn `partially_understood`: if you can tell what the learner meant, it is `understood`, and you fix it as above. Use `partially_understood` only when you cannot tell what they meant.",
+    "- Never correct: a valid short answer (「ラーメンです」, 「はい」), a name or loanword, a valid variant, or any low-confidence word. If unsure, leave both null.",
+    "- If the learner asks for help or a hint (e.g. 'hint', 'ヒント', 'help', 'what do I say', 「わかりません」), classify `dont_know`.",
+    "",
+    "ERROR CODES (use exactly these for `recast_candidate.error_code`):",
+    ...taxonomyFor(tutor.language).map((t) => `- ${t.code}: ${t.cardRule} (e.g. ${t.example.wrong} → ${t.example.right})`),
     "",
     "UNDERSTANDING RULES (most important)",
     "- The learner transcript has per-word confidence in parentheses. Low-confidence words may have been MISHEARD.",
@@ -39,7 +56,7 @@ export function buildStaticPrefix(tutor: TutorConfig, level: Level): string {
     "- A name, place or loanword the learner introduces (e.g. \"カルテックです\") is accepted as heard: you cannot verify names, and an unfamiliar-but-plausible word is NOT a reason to say partially_understood. Greet the learner by that name.",
     "- Use `partially_understood` only when the recogniser was confident but you genuinely cannot tell what the learner meant. Then your reply must be ONE short confirmation question that quotes what you heard (e.g. 「…」ですか？) and must not assume the answer.",
     "- If the learner uses English (or another language) to ask how to say something, classify `native_language_help`.",
-    "- Do not state or imply corrections inside `reply.sentences`. A single short echo of the correct form may go in `reply.recast` only for a clear error in a confidently recognised word.",
+    "- Do not state or imply corrections inside `reply.sentences`; corrections go only in `reply.recast`.",
     "",
     "OUTPUT",
     "Return JSON matching the provided schema exactly. Fill `analysis` first, then `reply`.",

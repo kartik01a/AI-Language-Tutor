@@ -9,7 +9,14 @@ import { validateReply } from "../lib/tutor/output-validation.ts";
 const tutor = Object.values(TUTORS)[0];
 const schema = strictJsonSchema(turnOutputSchema.omit({ hints: true, words_introduced: true }));
 const S = (text, q, expect, { conf = 0.93, topic = "食べ物", confirmed = false } = {}) => ({ text, q, expect, conf, topic, confirmed });
-const scenarios = [
+const scenarios = process.env.COACH ? [
+  S("昨日 友達 と 公園 を 行き ました", { text: "昨日は何をしましたか？", expects: "open" }, ["understood"]),
+  S("昨日 ラーメン", { text: "昨日は何を食べましたか？", expects: "open" }, ["understood"]),
+  S("週末 映画 を 見 ます とても 楽しい でした", { text: "週末は何をしましたか？", expects: "open" }, ["understood"]),
+  S("私 は 学生 です", { text: "お仕事は何ですか？", expects: "open" }, ["understood"]),
+  S("ラーメン です", { text: "好きな食べ物は何ですか？", expects: "open" }, ["understood"]),
+  S("東京 に 住み ます 去年 から", { text: "どこに住んでいますか？", expects: "open" }, ["understood"]),
+] : [
   S("こんにちは カルテック です", { text: "お名前は何ですか？", expects: "open" }, ["understood"], { topic: null }),
   S("食べ物 が 好き です", { text: "何について話したいですか？", expects: "topic" }, ["understood"], { topic: null }),
   S("私 は ラーメン が 好き です", { text: "好きな食べ物は何ですか？", expects: "open" }, ["understood"]),
@@ -44,6 +51,7 @@ for (const model of process.argv.slice(2)) {
     const cat = out.analysis.category;
     const pass = sc.expect.includes(cat); if (pass) ok++;
     const v = validateReply(out.reply.sentences, { lang: "ja", level: "A2" }); if (v.ok) valid++;
+    if (process.env.COACH) console.log("    recast:", JSON.stringify(out.reply.recast), "candidate:", JSON.stringify(out.analysis.recast_candidate));
     console.log(`${pass ? "ok  " : "DIFF"} ${sc.text.padEnd(22)} → ${cat.padEnd(20)} topic=${JSON.stringify(out.analysis.topic)} ${v.ok ? "" : "[invalid reply: " + v.issues.join(",") + "] "}\n       ${out.reply.sentences.join(" / ")}`);
   }
   console.log(`category ok ${ok}/${scenarios.length}, replies valid ${valid}/${scenarios.length}, median ${[...ms].sort((a, b) => a - b)[Math.floor(ms.length / 2)]} ms`);

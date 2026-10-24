@@ -167,7 +167,8 @@ export function spanConfidence(words: SttWord[], span: [number, number]): number
 export async function runCorrectionPipeline(llm: LlmProvider, input: PipelineInput): Promise<PipelineResult> {
   const k = input.samples ?? 3;
   const usage: LlmUsage[] = [];
-  const taxonomy = taxonomyFor(input.lang);
+  // Unfinished sentences are coached by the live turn call; the verified card pipeline stays on grammar errors.
+  const taxonomy = taxonomyFor(input.lang).filter((t) => t.code !== "ja.sentence.incomplete");
   const empty: PipelineResult = { cards: [], dropped: [], usage, validSamples: 0 };
   if (taxonomy.length === 0 || input.words.length === 0) return empty;
 
@@ -279,16 +280,19 @@ export async function runCorrectionPipeline(llm: LlmProvider, input: PipelineInp
 
 /**
  * Fast-path spoken recast (docs/06 §6): from the turn call's single `recast_candidate`, before the
- * full pipeline has run. Only high-confidence, common categories, never inside ASR-risk spans and
- * never ASR-fragile ones (those need the extra evidence the fast path doesn't have).
+ * full pipeline has run. Only high-confidence, common categories, never inside ASR-risk spans. ASR-fragile
+ * categories (particles…) are allowed only when every word involved was recognised with high confidence.
  */
+/** Fragile short words (particles) may be recast on the fast path only above this word confidence. */
+const FRAGILE_FAST_CONFIDENCE = 0.85;
+
 export function fastPathRecastAllowed(
   candidate: { error_code: string; original: string; corrected: string } | null,
   ctx: { words: SttWord[]; riskSpans: [number, number][]; level: Level; strictness: Strictness; relaxedRecastTurn?: boolean; recurrent?: Set<string> },
 ): boolean {
   if (!candidate) return false;
   const tax = lookup(candidate.error_code);
-  if (!tax || !tax.fastPathRecast || tax.asrFragile || tax.validVariety) return false;
+  if (!tax || !tax.fastPathRecast || tax.validVariety) return false;
   const sev = tax.severity[ctx.level];
   if (sev === 0) return false;
   if (ctx.strictness === "relaxed") return !!ctx.relaxedRecastTurn && sev === 3 && !!ctx.recurrent?.has(candidate.error_code);
@@ -297,6 +301,10 @@ export function fastPathRecastAllowed(
   const heard = ctx.words.map((w) => w.w).join("");
   const around = candidate.original.replace(/\s/g, "");
   if (!heard.includes(around)) return false;
+  if (tax.asrFragile) {
+    const involved = ctx.words.filter((w) => around.includes(w.w));
+    if (involved.length === 0 || involved.some((w) => w.conf === null || w.conf < FRAGILE_FAST_CONFIDENCE)) return false;
+  }
   // No low-confidence word anywhere in the sentence may sit inside the recast's text.
   return !ctx.riskSpans.some(([s, e]) => ctx.words.slice(s, e).some((w) => around.includes(w.w)));
 }

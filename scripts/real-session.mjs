@@ -33,11 +33,13 @@ await collect(svc.handleEvent(sessionId, { e: "topic_chip", label: "食べ物" }
 
 const script = [
   "私はラーメンが好きです。",
+  "昨日、ラーメン。",
   "きのう、友達と公園を行きました。",
-  "昨日、ラーメンを食べます。",
+  "ヒントください。",
+  "週末、映画を見ます、とても楽しいでした。",
 ];
 for (const line of script) {
-  await new Promise((r) => setTimeout(r, 6000)); // a learner takes a few seconds to answer: connections go idle
+  await new Promise((r) => setTimeout(r, 1500)); // a learner takes a few seconds to answer: connections go idle
   const clip = await say(line);
   const before = await cost();
   const t0 = Date.now();

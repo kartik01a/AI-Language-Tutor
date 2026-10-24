@@ -158,7 +158,7 @@ describe("session flow", () => {
       const r = await collect(svc.handleTurn(sessionId, audio, "audio/webm", speech));
       expect(r.types.at(-1)).toBe("turn_end");
       const hint = (await collect(svc.handleEvent(sessionId, { e: "hint_request" }))).events.find((e) => e.t === "hint");
-      expect(hint && hint.t === "hint" && hint.text).toBe("Say something short, like a topic you like.");
+      expect(hint && hint.t === "hint" && hint.text).toBe("Say what food you like."); // built-in example for the topic
     });
   });
 
@@ -313,7 +313,7 @@ describe("corrections in the live session", () => {
     for (let i = 0; i < 5; i++) await turn(svc, sessionId); // advance the demo script to the tense error
     const r = await turn(svc, sessionId);
     const texts = r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : []));
-    expect(texts[0]).toBe("ラーメンを食べたんですね！");
+    expect(texts[0]).toBe("「ラーメンを食べたんですね」と言うといいですよ。"); // Yuki says the fixed sentence aloud first
     const card = r.events.find((e) => e.t === "corrections");
     expect(card && card.t === "corrections" && card.cards[0]).toMatchObject({ errorCode: "ja.verb.tense", corrected: "たべました" });
   });
@@ -524,7 +524,11 @@ describe("Did you say …? (confirming an uncertain transcript)", () => {
     const r = await collect(svc.handleEvent(id, { e: "confirm_heard", yes: false }));
     expect(r.events.find((e) => e.t === "transcript")).toMatchObject({ display: "unclear", text: null });
     expect(r.events.find((e) => e.t === "category")).toMatchObject({ action: "SUGGEST_AND_MOVE_ON" });
-    expect(llm.calls).toHaveLength(0);
+    expect(llm.calls.filter((c) => c.schema?.name === "turn_output")).toHaveLength(0); // no tutor reply is generated
+    // "You can say:" is never left hanging: after a canned line there were no hints, so an example is produced or built in.
+    const spoken = r.events.flatMap((e) => (e.t === "sentence" ? [e.text] : []));
+    expect(spoken).toHaveLength(2);
+    expect(spoken[1]).toBe("e"); // the example from the hints request (the fake model's)
   });
 
   it("No (while choosing a topic): Yuki picks the topic, so nobody is stuck", async () => {

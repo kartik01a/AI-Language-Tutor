@@ -131,8 +131,16 @@ describe("fast-path spoken recast", () => {
   it("allows a confident, common, non-fragile category that matches what was heard", () => {
     expect(fastPathRecastAllowed(cand, ctx)).toBe(true);
   });
-  it("rejects ASR-fragile categories (particles) — they need the full pipeline's evidence", () => {
-    expect(fastPathRecastAllowed({ error_code: "ja.particle.destination", original: "を", corrected: "に" }, ctx)).toBe(false);
+  it("ASR-fragile categories (particles) need every involved word at high confidence", () => {
+    const particle = { error_code: "ja.particle.destination", original: "を", corrected: "に" };
+    const sure = { ...ctx, words: words([["公園", 0.97], ["を", 0.93], ["行きました", 0.96]]) };
+    expect(fastPathRecastAllowed(particle, sure)).toBe(true);
+    expect(fastPathRecastAllowed(particle, { ...sure, words: words([["公園", 0.97], ["を", 0.8], ["行きました", 0.96]]) })).toBe(false);
+    expect(fastPathRecastAllowed(particle, { ...sure, words: words([["公園", 0.97], ["を", null], ["行きました", 0.96]]) })).toBe(false);
+  });
+  it("an unfinished sentence can be recast when it was clearly heard", () => {
+    const w = { ...ctx, words: words([["昨日", 0.97], ["ラーメン", 0.96]]) };
+    expect(fastPathRecastAllowed({ error_code: "ja.sentence.incomplete", original: "昨日ラーメン", corrected: "昨日ラーメンを食べました" }, w)).toBe(true);
   });
   it("rejects unknown codes, a null candidate, and text that wasn't actually heard", () => {
     expect(fastPathRecastAllowed(null, ctx)).toBe(false);

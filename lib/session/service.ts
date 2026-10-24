@@ -8,7 +8,7 @@ import { processLearnerTurn } from "@/lib/tutor/turn-pipeline";
 import { fastPathRecastAllowed, runCorrectionPipeline } from "@/lib/tutor/correction-pipeline";
 import { translateLines } from "@/lib/tutor/translate";
 import { enrichTurn, questionOf } from "@/lib/tutor/enrich";
-import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, confirmLine, tidyHeard, templateFor, type Spoken } from "@/lib/tutor/templates";
+import { YUKI_CHIPS, YUKI_CLOSING, YUKI_GREETING, NUDGE_LINE, confirmLine, tidyHeard, templateFor, type Spoken, correctionLine, fallbackHint } from "@/lib/tutor/templates";
 import { TUTORS } from "@/lib/tutor/tutors";
 import type { Level, Strictness } from "@/lib/tutor/corrections";
 import type { DialogueEvent, MachineConfig, StepResult } from "@/lib/tutor/types";
@@ -154,6 +154,27 @@ export class SessionService {
     if (!ok) yield this.emit(rec, { t: "error", code: "STATE_CONFLICT", retryable: true, message: "Session changed elsewhere; please retry." });
   }
 
+  /**
+   * Hints normally arrive with each reply. After a canned line (greeting, topic chip, "didn't catch that") there
+   * are none, so make them now for the question on screen; if that is slow or fails, use a built-in example.
+   */
+  private async ensureHints(rec: SessionRecord): Promise<void> {
+    if (rec.lastHints) return;
+    const question = rec.currentQuestion?.text;
+    if (question) {
+      const e = await Promise.race([
+        enrichTurn(this.d.llm, { level: rec.level, question, tutorReply: [question], learnerText: "" }),
+        new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+      ]);
+      if (e) {
+        rec.lastHints = e.enrichment.hints;
+        await this.addSpend(rec, llmCost(e.usage.model ?? "gpt-6-luna", e.usage));
+        return;
+      }
+    }
+    rec.lastHints = fallbackHint(rec.state.topic?.label);
+  }
+
   private hintText(rec: SessionRecord, level: 1 | 2 | 3): { text: string; translation?: string } {
     const h = rec.lastHints;
     if (!h) return { text: level === 1 ? "Say something short, like a topic you like." : "Try: 好きな食べ物は…" };
@@ -250,6 +271,7 @@ export class SessionService {
       }
       case "hint_request": {
         const r = this.applyStep(rec, { type: "hint_request" });
+        if (r.action.kind === "HINT" || r.action.kind === "MODEL_ANSWER_AND_MOVE_ON") await this.ensureHints(rec);
         if (r.action.kind === "HINT") {
           rec.metrics.hintsUsed++;
           rec.metrics.maxHintLevel = Math.max(rec.metrics.maxHintLevel, r.action.level);
@@ -263,6 +285,7 @@ export class SessionService {
       case "silence_timeout": {
         const r = this.applyStep(rec, { type: "silence_timeout" });
         if (r.action.kind === "HINT") {
+          await this.ensureHints(rec);
           yield* this.speak(rec, [NUDGE_LINE], "template", messageId);
           yield this.emit(rec, { t: "hint", level: r.action.level, ...this.hintText(rec, r.action.level) });
         } else if (r.close) {
@@ -414,10 +437,14 @@ export class SessionService {
         words: result.asr.words, riskSpans: result.gate.riskSpans, level: rec.level, strictness: rec.strictness,
         relaxedRecastTurn: rec.metrics.learnerTurns % 2 === 0, recurrent,
       });
-      if (ok) recast = { text: result.analysis.reply.recast, translation: "" };
+      const heard = result.asr.text.replace(/[\s。、！？!?]/g, "");
+      const fixed = result.analysis.reply.recast.replace(/[\s。、！？!?]/g, "");
+      // Only when it really differs from what was said (a "correction" identical to the input is noise).
+      if (ok && fixed !== heard) recast = correctionLine(result.analysis.reply.recast);
     }
 
     // What the tutor says: a template for recovery actions, the validated LLM reply otherwise.
+    if (result.action.kind === "SUGGEST_AND_MOVE_ON") await this.ensureHints(rec);
     const example = rec.lastHints ? { text: rec.lastHints.example, translation: rec.lastHints.example_translation } : undefined;
     const tmpl = result.modelClarification ? null : templateFor(result.action, { example, silent: result.category === "NO_SPEECH" });
     // First audio = the moment the first audio frame is ready to leave the server.

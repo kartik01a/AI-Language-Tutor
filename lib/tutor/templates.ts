@@ -95,3 +95,20 @@ export function confirmLine(heard: string): Spoken {
   const t = tidyHeard(heard);
   return { text: `「${t}」と聞こえました。合っていますか？`, translation: `I heard “${t}”. Is that right?` };
 }
+
+/** Yuki fixes the learner's sentence aloud, then carries on with the conversation. */
+export function correctionLine(corrected: string): Spoken {
+  // The model sometimes quotes or wraps the sentence itself: keep only the sentence.
+  const inner = corrected.match(/^「(.+?)」/)?.[1] ?? corrected;
+  const t = tidyHeard(inner);
+  return { text: `「${t}」と言うといいですよ。`, translation: "" };
+}
+
+/** Examples for when no generated hint exists (e.g. right after a canned greeting) and the generator is unavailable. */
+const FALLBACK_HINTS: Record<string, { hint: string; starter: string; example: string; example_translation: string }> = {
+  食べ物: { hint: "Say what food you like.", starter: "私は___が好きです。", example: "私はラーメンが好きです。", example_translation: "I like ramen." },
+  週末: { hint: "Say one thing you did at the weekend.", starter: "週末は___をしました。", example: "週末は友達に会いました。", example_translation: "I met a friend at the weekend." },
+  旅行: { hint: "Say a place you want to visit.", starter: "___に行きたいです。", example: "京都に行きたいです。", example_translation: "I want to go to Kyoto." },
+};
+export const GENERIC_HINT = { hint: "Say a short sentence about yourself.", starter: "私は___です。", example: "私は学生です。", example_translation: "I am a student." };
+export const fallbackHint = (topic: string | null | undefined) => (topic && FALLBACK_HINTS[topic]) || GENERIC_HINT;

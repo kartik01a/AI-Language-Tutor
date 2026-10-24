@@ -5,8 +5,8 @@ import type { Level } from "./corrections";
 
 export type Lang = "ja" | "de" | "en";
 
-const WORD_BUDGET: Record<Level, number> = { A1: 12, A2: 20, B1: 45, B2: 60 };
-const JA_CHAR_BUDGET: Record<Level, number> = { A1: 30, A2: 50, B1: 90, B2: 120 };
+const WORD_BUDGET: Record<Level, number> = { A1: 12, A2: 30, B1: 45, B2: 60 };
+const JA_CHAR_BUDGET: Record<Level, number> = { A1: 30, A2: 65, B1: 90, B2: 120 };
 const TOLERANCE = 1.3;
 
 const JA_RE = /[぀-ヿ㐀-鿿ｦ-ﾟ]/g;
