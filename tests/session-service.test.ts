@@ -3,7 +3,7 @@ import { loadConfig } from "@/lib/config";
 import { MemorySpendStore, monthKey } from "@/lib/limits/budget";
 import { DemoLlm, DemoStt, DemoTts } from "@/lib/providers/demo";
 import { FakeLlm, FakeStt, stt } from "@/lib/providers/fakes";
-import { SessionService, ServiceError, type OutFrame } from "@/lib/session/service";
+import { SessionService, ServiceError, yesNo, type OutFrame } from "@/lib/session/service";
 import { MemorySessionStore } from "@/lib/session/store";
 import type { ServerEvent } from "@/lib/contracts/events";
 import type { SttProvider } from "@/lib/providers/types";
@@ -552,6 +552,24 @@ describe("Did you say …? (confirming an uncertain transcript)", () => {
     expect(spoken[1]).toBe("e"); // the example from the hints request (the fake model's)
   });
 
+  it("saying はい out loud answers 'Did you say …?' like the Yes button, without a new bubble", async () => {
+    const { svc, llm } = make([mid(), stt("はい", 0.96)]);
+    const id = await begin(svc);
+    await collect(svc.handleTurn(id, audio, "audio/webm", speech)); // asks "Did you say …?"
+    const r = await collect(svc.handleTurn(id, audio, "audio/webm", { speechMs: 300, clipMs: 1600 }));
+    expect(r.events.find((e) => e.t === "category")).toMatchObject({ category: "UNDERSTOOD" });
+    expect(r.events.filter((e) => e.t === "transcript").every((e) => e.t === "transcript" && e.text !== "はい")).toBe(true);
+    expect(llm.calls.filter((c) => c.schema?.name === "turn_output")).toHaveLength(1);
+  });
+
+  it("saying いいえ out loud answers No: the learner is guided instead of asked again", async () => {
+    const { svc } = make([mid(), stt("いいえ", 0.96)]);
+    const id = await begin(svc);
+    await collect(svc.handleTurn(id, audio, "audio/webm", speech));
+    const r = await collect(svc.handleTurn(id, audio, "audio/webm", { speechMs: 400, clipMs: 1600 }));
+    expect(r.events.find((e) => e.t === "category")).toMatchObject({ action: "SURPRISE_TOPIC" });
+  });
+
   it("No (while choosing a topic): Yuki picks the topic, so nobody is stuck", async () => {
     const { svc } = make([mid()]);
     const id = await begin(svc);
@@ -669,5 +687,16 @@ describe("topic selection stays open until the learner actually names a topic", 
   });
   it("naming a topic ends topic selection", async () => {
     expect(await run("食べ物")).toMatchObject({ phase: "CONVERSATION" });
+  });
+});
+
+describe("yesNo", () => {
+  it("accepts only a short spoken yes or no", () => {
+    expect(yesNo("はい。")).toBe(true);
+    expect(yesNo("はい、そうです")).toBe(true);
+    expect(yesNo("いいえ")).toBe(false);
+    expect(yesNo("違います")).toBe(false);
+    expect(yesNo("はい、昨日ラーメンを食べました")).toBeNull();
+    expect(yesNo("")).toBeNull();
   });
 });

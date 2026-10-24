@@ -10,6 +10,9 @@ const tutor = Object.values(TUTORS)[0];
 const schema = strictJsonSchema(turnOutputSchema.omit({ hints: true, words_introduced: true }));
 const S = (text, q, expect, { conf = 0.93, topic = "食べ物", confirmed = false } = {}) => ({ text, q, expect, conf, topic, confirmed });
 const scenarios = process.env.COACH ? [
+  S("焼き おにぎり 飲み ます", { text: "何を食べましたか？", expects: "open" }, ["understood"]),
+  S("おにぎり 飲み ます", { text: "好きな食べ物は何ですか？", expects: "open" }, ["understood"]),
+  S("私 は 水 を 食べ ます", { text: "何を飲みますか？", expects: "open" }, ["understood"]),
   S("昨日 友達 と 公園 を 行き ました", { text: "昨日は何をしましたか？", expects: "open" }, ["understood"]),
   S("昨日 ラーメン", { text: "昨日は何を食べましたか？", expects: "open" }, ["understood"]),
   S("週末 映画 を 見 ます とても 楽しい でした", { text: "週末は何をしましたか？", expects: "open" }, ["understood"]),

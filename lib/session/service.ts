@@ -32,6 +32,14 @@ export interface ServiceDeps {
   onActivity?: () => void;
 }
 
+/** A spoken yes/no (and only that) to "Did you say …?". Anything longer is a new answer, not a reply to the question. */
+export function yesNo(text: string): boolean | null {
+  const t = text.toLowerCase().replace(/[\s。、．，,.!！?？「」]/g, "");
+  if (/^(はい|ええ|うん|そう|そうです|はいそうです|はいそうですね|そうですね|あってます|あっています|合ってます|合っています|いいです|オーケー|ok|yes|yeah)$/.test(t)) return true;
+  if (/^(いいえ|いえ|ううん|ちがう|ちがいます|違う|違います|ちがうよ|だめ|no|nope)$/.test(t)) return false;
+  return null;
+}
+
 export class ServiceError extends Error {
   constructor(public code: ErrorCode, message: string, public retryable = false) {
     super(message);
@@ -330,6 +338,15 @@ export class SessionService {
   ): AsyncGenerator<OutFrame> {
     this.d.onActivity?.();
     const { rec, rev } = await this.load(sessionId);
+    // While "Did you say …?" is open, saying はい / いいえ out loud answers it, exactly like the buttons.
+    if (rec.pendingConfirm && !opts.precomputed && clip.speechMs >= 150) {
+      const heard = await this.d.stt.transcribe(audio, mime, ["ja", "en"]).then((r) => r.text, () => "");
+      const yn = yesNo(heard);
+      if (yn !== null) {
+        yield* this.confirmHeard(sessionId, yn);
+        return;
+      }
+    }
     // A fresh recording supersedes an unanswered "Did you say …?" (it already used up an attempt).
     if (!opts.precomputed) rec.pendingConfirm = null;
     if (rec.state.phase === "ENDED") {

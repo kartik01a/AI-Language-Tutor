@@ -15,7 +15,7 @@ const schema = z.object({
   SILENCE_NUDGE_SECONDS: z.coerce.number().positive().default(25),
   UNCLEAR_MAX_RETRIES: z.coerce.number().int().min(0).default(1),
   MAX_RECORDING_SECONDS: z.coerce.number().positive().default(30),
-  MIN_SPEECH_MS: z.coerce.number().positive().default(400),
+  MIN_SPEECH_MS: z.coerce.number().positive().default(250),
   IDLE_PAUSE_SECONDS: z.coerce.number().positive().default(90),
   RECONNECT_WINDOW_SECONDS: z.coerce.number().positive().default(120),
   TRIAL_ACCOUNTS_PER_IP_PER_DAY: z.coerce.number().int().positive().default(3),

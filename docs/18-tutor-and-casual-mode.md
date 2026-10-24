@@ -27,7 +27,7 @@ Switch any time: the pill in the header during a conversation, or the toggle on 
 3. Code decides, not the model: in Casual `allowCorrections` is false, so no spoken fix, no detection calls, no cards.
 4. Spoken fix gate (`fastPathRecastAllowed`): known error code, text really heard, no low-confidence word near it, particles only if every word
    involved has confidence ≥ 0.85, severity ≥ 1 in strict. New codes: `ja.sentence.incomplete`, `ja.phrasing.unnatural`
-   (grammatical but not what a native would say, e.g. 私はおにぎりがおいしいです → おにぎりはおいしいです). `ja.particle.wa_ga` is now fast-path eligible.
+   (grammatical but not what a native would say, e.g. 私はおにぎりがおいしいです → おにぎりはおいしいです).  (`ja.particle.wa_ga` stays card-only: the model sometimes swapped は/が on a correct sentence.) `ja.vocab.word_choice` is fast-path eligible (wrong verb/noun, e.g. 飲む for onigiri).
 5. The verified card pipeline does not see the two new codes (the live turn call handles them).
 
 ## Measured (20 seed sentences + 4 extra, gpt-5.6-luna)
